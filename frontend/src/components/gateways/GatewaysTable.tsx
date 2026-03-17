@@ -100,7 +100,7 @@ export function GatewaysTable({
         accessorKey: "workspace_root",
         header: "Workspace root",
         cell: ({ row }) => (
-          <span className="text-sm text-slate-700">
+          <span className="text-sm text-strong">
             {truncate(row.original.workspace_root, 28)}
           </span>
         ),

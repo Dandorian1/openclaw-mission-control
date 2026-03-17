@@ -58,7 +58,7 @@ export function UserMenu({
           type="button"
           className={cn(
             "group inline-flex h-9 items-center gap-2 rounded-[10px] bg-transparent px-1 py-1 transition",
-            "hover:bg-white/70",
+            "hover:bg-[color:var(--surface-muted)]",
             // Avoid the default browser focus outline (often bright blue) on click.
             // Keep a subtle, enterprise-looking focus ring for keyboard navigation.
             "focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--neutral-300,var(--border-strong))] focus-visible:ring-offset-2 focus-visible:ring-offset-white",

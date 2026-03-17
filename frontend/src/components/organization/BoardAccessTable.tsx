@@ -97,7 +97,7 @@ export function BoardAccessTable({
   return (
     <DataTable
       table={table}
-      rowClassName="border-t border-slate-200 hover:bg-[color:var(--surface-muted)]"
+      rowClassName="border-t border-[color:var(--border)] hover:bg-[color:var(--surface-muted)]"
       headerClassName="bg-[color:var(--surface-muted)] text-[11px] uppercase tracking-wide text-muted"
       headerCellClassName="px-4 py-2 font-medium"
       cellClassName="px-4 py-3"

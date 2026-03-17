@@ -4425,7 +4425,7 @@ export default function BoardDetailPage() {
                           className={cn(
                             "rounded-full p-0.5 text-muted transition",
                             canWrite
-                              ? "hover:bg-white hover:text-strong"
+                              ? "hover:bg-[color:var(--surface)] hover:text-strong"
                               : "opacity-50 cursor-not-allowed",
                           )}
                           aria-label="Remove tag"
@@ -4498,7 +4498,7 @@ export default function BoardDetailPage() {
                             className={cn(
                               "rounded-full p-0.5 text-muted transition",
                               canWrite
-                                ? "hover:bg-white hover:text-strong"
+                                ? "hover:bg-[color:var(--surface)] hover:text-strong"
                                 : "opacity-50 cursor-not-allowed",
                             )}
                             aria-label="Remove dependency"
@@ -4701,7 +4701,7 @@ export default function BoardDetailPage() {
                         <button
                           type="button"
                           onClick={() => removeCreateTag(tagId)}
-                          className="rounded-full p-0.5 text-muted transition hover:bg-white hover:text-strong"
+                          className="rounded-full p-0.5 text-muted transition hover:bg-[color:var(--surface)] hover:text-strong"
                           aria-label="Remove tag"
                           disabled={!canWrite || isCreating}
                         >
