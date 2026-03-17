@@ -19,6 +19,7 @@ from uuid import uuid4
 import websockets
 from websockets.exceptions import WebSocketException
 
+from app.core.config import settings
 from app.core.logging import TRACE_LEVEL, get_logger
 from app.services.openclaw.device_identity import (
     build_device_auth_payload,
@@ -168,7 +169,18 @@ class OpenClawGatewayError(RuntimeError):
 
 @dataclass(frozen=True)
 class GatewayConfig:
-    """Connection configuration for the OpenClaw gateway."""
+    """Connection configuration for the OpenClaw gateway.
+
+    ``allow_insecure_tls`` disables certificate and hostname verification for
+    ``wss://`` connections.  It is intended for local/dev environments where a
+    self-signed certificate is in use.
+
+    **Production safety:** setting ``allow_insecure_tls=True`` while
+    ``ENVIRONMENT=production`` is a hard error.  The application will raise a
+    ``RuntimeError`` at connection time to prevent silent MITM exposure in
+    production deployments.  Use a valid, trusted TLS certificate in production
+    instead of enabling this flag.
+    """
 
     url: str
     token: str | None = None
@@ -200,12 +212,21 @@ def _create_ssl_context(config: GatewayConfig) -> ssl.SSLContext | None:
     This behavior is intentionally host-agnostic: when ``allow_insecure_tls`` is
     enabled for a ``wss://`` gateway, certificate and hostname verification are
     disabled for that gateway connection.
+
+    **Production guard:** raises ``RuntimeError`` if ``allow_insecure_tls`` is
+    ``True`` and the current environment is production.  This prevents silent
+    MITM exposure — production deployments must use valid TLS certificates.
     """
     parsed = urlparse(config.url)
     if parsed.scheme != "wss":
         return None
     if not config.allow_insecure_tls:
         return None
+    if settings.is_production:
+        raise RuntimeError(
+            "allow_insecure_tls=True is not permitted in production (ENVIRONMENT=production). "
+            "Use a valid TLS certificate for production gateway connections."
+        )
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     ssl_context.check_hostname = False
     ssl_context.verify_mode = ssl.CERT_NONE

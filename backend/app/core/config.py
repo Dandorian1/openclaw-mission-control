@@ -140,5 +140,15 @@ class Settings(BaseSettings):
             self.db_auto_migrate = True
         return self
 
+    @property
+    def is_production(self) -> bool:
+        """Return True when running in a production environment.
+
+        The ``ENVIRONMENT`` variable must be set to ``"production"`` (case-insensitive)
+        to be considered production. All other values (e.g. ``"dev"``, ``"staging"``,
+        ``"test"``) are treated as non-production.
+        """
+        return self.environment.strip().lower() == "production"
+
 
 settings = Settings()
