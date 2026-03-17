@@ -157,7 +157,7 @@ export const formatCustomFieldDetailValue = (
     try {
       const normalized = typeof value === "string" ? JSON.parse(value) : value;
       return (
-        <pre className="whitespace-pre-wrap break-words rounded border border-slate-200 bg-white px-2 py-1 font-mono text-xs leading-relaxed text-slate-800">
+        <pre className="whitespace-pre-wrap break-words rounded border border-[color:var(--border)] bg-[color:var(--surface)] px-2 py-1 font-mono text-xs leading-relaxed text-slate-800">
           {JSON.stringify(normalized, null, 2)}
         </pre>
       );

@@ -438,7 +438,7 @@ function InfoBlock({
           <h3 className="text-lg font-semibold text-strong">{title}</h3>
           {infoText ? (
             <span
-              className="inline-flex text-slate-400"
+              className="inline-flex text-quiet"
               title={infoText}
               aria-label={infoText}
             >
@@ -453,17 +453,17 @@ function InfoBlock({
                 ? "bg-emerald-100 text-emerald-700"
                 : badge.tone === "offline"
                   ? "bg-rose-100 text-rose-700"
-                  : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
+                  : "bg-slate-200 text-strong dark:bg-slate-700 dark:text-slate-200"
             }`}
           >
             {badge.text}
           </span>
         ) : null}
       </div>
-      <div className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+      <div className="divide-y divide-[color:var(--border)] rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)]">
         {rows.map((row) => (
           <div key={`${row.label}-${row.value}`} className="flex items-start justify-between gap-3 px-3 py-2">
-            <span className="min-w-0 text-sm text-slate-500">{row.label}</span>
+            <span className="min-w-0 text-sm text-muted">{row.label}</span>
             <span
               className={`max-w-[65%] break-words text-right text-sm font-medium leading-5 ${
                 row.tone === "success"
@@ -991,7 +991,7 @@ export default function DashboardPage() {
                 </div>
               ) : hasPendingApprovals ? (
                 <div className="space-y-2">
-                  <div className="divide-y divide-slate-200 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] dark:divide-slate-800">
+                  <div className="divide-y divide-[color:var(--border)] rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] dark:divide-slate-800">
                     {pendingApprovalItems.map((item) => (
                       <Link
                         key={item.approval_id}

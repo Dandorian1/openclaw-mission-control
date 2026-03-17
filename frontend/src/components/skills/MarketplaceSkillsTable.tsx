@@ -68,7 +68,7 @@ function riskPillClassName(risk: string | null | undefined) {
     case "critical":
       return "bg-[color:rgba(244,63,94,0.16)] text-rose-800 border border-rose-200/70";
     case "unknown":
-      return "bg-[color:rgba(148,163,184,0.16)] text-slate-700 border border-slate-200/80";
+      return "bg-[color:rgba(148,163,184,0.16)] text-strong border border-[color:var(--border)]/80";
     default:
       return "bg-[color:rgba(99,102,241,0.16)] text-indigo-800 border border-indigo-200/70";
   }
@@ -134,12 +134,12 @@ export function MarketplaceSkillsTable({
                 {row.original.name}
               </button>
             ) : (
-              <p className="text-sm font-medium text-slate-900">
+              <p className="text-sm font-medium text-strong">
                 {row.original.name}
               </p>
             )}
             <p
-              className="mt-1 line-clamp-2 text-xs text-slate-500"
+              className="mt-1 line-clamp-2 text-xs text-muted"
               title={row.original.description || "No description provided."}
             >
               {row.original.description || "No description provided."}
@@ -155,7 +155,7 @@ export function MarketplaceSkillsTable({
           return (
             <Link
               href={packsHrefFromPackUrl(packUrl)}
-              className="inline-flex items-center gap-1 text-sm font-medium text-slate-700 hover:text-blue-600"
+              className="inline-flex items-center gap-1 text-sm font-medium text-strong hover:text-blue-600"
             >
               {truncate(packLabelFromUrl(packUrl), 40)}
             </Link>
@@ -166,7 +166,7 @@ export function MarketplaceSkillsTable({
         accessorKey: "category",
         header: "Category",
         cell: ({ row }) => (
-          <span className="text-sm text-slate-700">
+          <span className="text-sm text-strong">
             {row.original.category || "uncategorized"}
           </span>
         ),
@@ -190,7 +190,7 @@ export function MarketplaceSkillsTable({
           const sourceHref = row.original.source || row.original.source_url;
 
           if (!sourceHref) {
-            return <span className="text-sm text-slate-400">No source</span>;
+            return <span className="text-sm text-quiet">No source</span>;
           }
 
           return (
@@ -198,7 +198,7 @@ export function MarketplaceSkillsTable({
               href={sourceHref}
               target="_blank"
               rel="noreferrer"
-              className="text-sm font-medium text-slate-700 hover:text-blue-600 hover:underline"
+              className="text-sm font-medium text-strong hover:text-blue-600 hover:underline"
               title={sourceHref}
             >
               {truncate(sourceHref, 36)}
@@ -214,7 +214,7 @@ export function MarketplaceSkillsTable({
           const installedOn =
             installedGatewayNamesBySkillId?.[row.original.id] ?? [];
           if (installedOn.length === 0) {
-            return <span className="text-sm text-slate-500">-</span>;
+            return <span className="text-sm text-muted">-</span>;
           }
           return (
             <div className="flex flex-wrap gap-1">
@@ -223,7 +223,7 @@ export function MarketplaceSkillsTable({
                 return (
                   <span
                     key={`${gateway.id}-${index}`}
-                    className="inline-flex items-center gap-1 text-sm text-slate-700"
+                    className="inline-flex items-center gap-1 text-sm text-strong"
                     title={gateway.name}
                   >
                     <Link
@@ -302,7 +302,7 @@ export function MarketplaceSkillsTable({
       table={table}
       isLoading={isLoading}
       stickyHeader={stickyHeader}
-      rowClassName="transition hover:bg-slate-50"
+      rowClassName="transition hover:bg-[color:var(--surface-muted)]"
       cellClassName="px-6 py-4 align-top"
       emptyState={
         emptyState

@@ -94,8 +94,8 @@ export function BoardGroupsTable({
             label: row.original.name,
             subtitle: row.original.description ?? "No description",
             subtitleClassName: row.original.description
-              ? "mt-1 line-clamp-2 text-xs text-slate-500"
-              : "mt-1 text-xs text-slate-400",
+              ? "mt-1 line-clamp-2 text-xs text-muted"
+              : "mt-1 text-xs text-quiet",
           }),
       },
       {
@@ -129,7 +129,7 @@ export function BoardGroupsTable({
       isLoading={isLoading}
       stickyHeader={stickyHeader}
       emptyMessage={emptyMessage}
-      rowClassName="transition hover:bg-slate-50"
+      rowClassName="transition hover:bg-[color:var(--surface-muted)]"
       cellClassName="px-3 py-3 md:px-6 md:py-4 align-top"
       rowActions={
         showActions

@@ -133,11 +133,11 @@ export default function NewBoardGroupPage() {
     >
       <form
         onSubmit={handleSubmit}
-        className="space-y-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+        className="space-y-6 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-sm"
       >
         <div className="grid gap-6 md:grid-cols-2">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-900">
+            <label className="text-sm font-medium text-strong">
               Group name <span className="text-red-500">*</span>
             </label>
             <Input
@@ -150,7 +150,7 @@ export default function NewBoardGroupPage() {
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-900">
+          <label className="text-sm font-medium text-strong">
             Description
           </label>
           <Textarea
@@ -164,8 +164,8 @@ export default function NewBoardGroupPage() {
 
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <label className="text-sm font-medium text-slate-900">Boards</label>
-            <span className="text-xs text-slate-500">
+            <label className="text-sm font-medium text-strong">Boards</label>
+            <span className="text-xs text-muted">
               {selectedBoardIds.size} selected
             </span>
           </div>
@@ -175,9 +175,9 @@ export default function NewBoardGroupPage() {
             placeholder="Search boards..."
             disabled={isCreating}
           />
-          <div className="max-h-64 overflow-auto rounded-xl border border-slate-200 bg-slate-50/40">
+          <div className="max-h-64 overflow-auto rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-muted)]/40">
             {boardsQuery.isLoading ? (
-              <div className="px-4 py-6 text-sm text-slate-500">
+              <div className="px-4 py-6 text-sm text-muted">
                 Loading boards…
               </div>
             ) : boardsQuery.error ? (
@@ -185,11 +185,11 @@ export default function NewBoardGroupPage() {
                 {boardsQuery.error.message}
               </div>
             ) : boards.length === 0 ? (
-              <div className="px-4 py-6 text-sm text-slate-500">
+              <div className="px-4 py-6 text-sm text-muted">
                 No boards found.
               </div>
             ) : (
-              <ul className="divide-y divide-slate-200">
+              <ul className="divide-y divide-[color:var(--border)]">
                 {boards
                   .filter((board) => {
                     const q = boardSearch.trim().toLowerCase();
@@ -223,11 +223,11 @@ export default function NewBoardGroupPage() {
                             disabled={isCreating}
                           />
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-slate-900">
+                            <p className="truncate text-sm font-medium text-strong">
                               {board.name}
                             </p>
-                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                              <span className="font-mono text-[11px] text-slate-400">
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
+                              <span className="font-mono text-[11px] text-quiet">
                                 {board.id}
                               </span>
                               {isAlreadyGrouped ? (
@@ -244,7 +244,7 @@ export default function NewBoardGroupPage() {
               </ul>
             )}
           </div>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted">
             Optional. Selected boards will be assigned to this group after
             creation. You can change membership later in group edit or board
             settings.
@@ -267,7 +267,7 @@ export default function NewBoardGroupPage() {
           </Button>
         </div>
 
-        <div className="border-t border-slate-100 pt-4 text-xs text-slate-500">
+        <div className="border-t border-slate-100 pt-4 text-xs text-muted">
           Want to assign boards later? Update each board in{" "}
           <Link
             href="/boards"

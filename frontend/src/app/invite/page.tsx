@@ -69,7 +69,7 @@ function InviteContent() {
 
   return (
     <div className="min-h-screen bg-app text-strong">
-      <header className="border-b border-[color:var(--border)] bg-white">
+      <header className="border-b border-[color:var(--border)] bg-[color:var(--surface)]">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <BrandMark />
         </div>
@@ -152,7 +152,7 @@ export default function InvitePage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-app text-strong">
-          <header className="border-b border-[color:var(--border)] bg-white">
+          <header className="border-b border-[color:var(--border)] bg-[color:var(--surface)]">
             <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
               <BrandMark />
             </div>

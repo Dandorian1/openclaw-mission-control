@@ -288,7 +288,7 @@ export default function EditBoardGroupPage() {
     >
       <form
         onSubmit={handleSubmit}
-        className="space-y-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+        className="space-y-6 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-sm"
       >
         {assignFailedCount && Number.isFinite(assignFailedCount) ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm">
@@ -298,7 +298,7 @@ export default function EditBoardGroupPage() {
         ) : null}
         <div className="grid gap-6 md:grid-cols-2">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-900">
+            <label className="text-sm font-medium text-strong">
               Group name <span className="text-red-500">*</span>
             </label>
             <Input
@@ -311,7 +311,7 @@ export default function EditBoardGroupPage() {
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-900">
+          <label className="text-sm font-medium text-strong">
             Description
           </label>
           <Textarea
@@ -326,13 +326,13 @@ export default function EditBoardGroupPage() {
         <div className="space-y-2 border-t border-slate-100 pt-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-sm font-medium text-slate-900">Boards</p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="text-sm font-medium text-strong">Boards</p>
+              <p className="mt-1 text-xs text-muted">
                 Assign boards to this group to share context across related
                 work.
               </p>
             </div>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-muted">
               {selectedBoardIds.size} selected
             </span>
           </div>
@@ -344,9 +344,9 @@ export default function EditBoardGroupPage() {
             disabled={isLoading || !baseGroup}
           />
 
-          <div className="max-h-64 overflow-auto rounded-xl border border-slate-200 bg-slate-50/40">
+          <div className="max-h-64 overflow-auto rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-muted)]/40">
             {boardsLoading && boards.length === 0 ? (
-              <div className="px-4 py-6 text-sm text-slate-500">
+              <div className="px-4 py-6 text-sm text-muted">
                 Loading boards…
               </div>
             ) : boardsError ? (
@@ -354,11 +354,11 @@ export default function EditBoardGroupPage() {
                 {boardsError.message}
               </div>
             ) : boards.length === 0 ? (
-              <div className="px-4 py-6 text-sm text-slate-500">
+              <div className="px-4 py-6 text-sm text-muted">
                 No boards found.
               </div>
             ) : (
-              <ul className="divide-y divide-slate-200">
+              <ul className="divide-y divide-[color:var(--border)]">
                 {boards
                   .filter((board) => {
                     const q = boardSearch.trim().toLowerCase();
@@ -394,11 +394,11 @@ export default function EditBoardGroupPage() {
                             disabled={isLoading || !baseGroup}
                           />
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-slate-900">
+                            <p className="truncate text-sm font-medium text-strong">
                               {board.name}
                             </p>
-                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                              <span className="font-mono text-[11px] text-slate-400">
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
+                              <span className="font-mono text-[11px] text-quiet">
                                 {board.id}
                               </span>
                               {isAlreadyGrouped ? (
@@ -420,7 +420,7 @@ export default function EditBoardGroupPage() {
             <p className="text-sm text-rose-700">{assignmentsError}</p>
           ) : null}
           {assignmentsResult ? (
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-strong">
               Updated {assignmentsResult.updated} board
               {assignmentsResult.updated === 1 ? "" : "s"}, failed{" "}
               {assignmentsResult.failed}.

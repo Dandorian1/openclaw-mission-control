@@ -138,13 +138,13 @@ export function MarketplaceSkillForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+      className="space-y-6 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-sm"
     >
       <div className="space-y-5">
         <div className="space-y-2">
           <label
             htmlFor="source-url"
-            className="text-xs font-semibold uppercase tracking-wider text-slate-500"
+            className="text-xs font-semibold uppercase tracking-wider text-muted"
           >
             {sourceLabel}
           </label>
@@ -158,7 +158,7 @@ export function MarketplaceSkillForm({
             disabled={isSubmitting || sourceUrlReadOnly}
           />
           {sourceUrlHelpText ? (
-            <p className="text-xs text-slate-500">{sourceUrlHelpText}</p>
+            <p className="text-xs text-muted">{sourceUrlHelpText}</p>
           ) : null}
         </div>
 
@@ -166,7 +166,7 @@ export function MarketplaceSkillForm({
           <div className="space-y-2">
             <label
               htmlFor="skill-branch"
-              className="text-xs font-semibold uppercase tracking-wider text-slate-500"
+              className="text-xs font-semibold uppercase tracking-wider text-muted"
             >
               {branchLabel}
             </label>
@@ -183,7 +183,7 @@ export function MarketplaceSkillForm({
         <div className="space-y-2">
           <label
             htmlFor="skill-name"
-            className="text-xs font-semibold uppercase tracking-wider text-slate-500"
+            className="text-xs font-semibold uppercase tracking-wider text-muted"
           >
             {nameLabel}
           </label>
@@ -199,7 +199,7 @@ export function MarketplaceSkillForm({
         <div className="space-y-2">
           <label
             htmlFor="skill-description"
-            className="text-xs font-semibold uppercase tracking-wider text-slate-500"
+            className="text-xs font-semibold uppercase tracking-wider text-muted"
           >
             {descriptionLabel}
           </label>

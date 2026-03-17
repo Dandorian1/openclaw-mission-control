@@ -134,7 +134,7 @@ const MARKDOWN_CODE_COMPONENTS: Components = {
       return (
         <code
           className={cn(
-            "rounded bg-slate-100 px-1 py-0.5 font-mono text-[0.85em] text-slate-900",
+            "rounded bg-[color:var(--surface-strong)] px-1 py-0.5 font-mono text-[0.85em] text-strong",
             className,
           )}
           {...props}
@@ -160,10 +160,10 @@ const MARKDOWN_TABLE_COMPONENTS: Components = {
     </div>
   ),
   thead: ({ node: _node, className, ...props }) => (
-    <thead className={cn("bg-slate-50", className)} {...props} />
+    <thead className={cn("bg-[color:var(--surface-muted)]", className)} {...props} />
   ),
   tbody: ({ node: _node, className, ...props }) => (
-    <tbody className={cn("divide-y divide-slate-100", className)} {...props} />
+    <tbody className={cn("divide-y divide-[color:var(--border)]", className)} {...props} />
   ),
   tr: ({ node: _node, className, ...props }) => (
     <tr className={cn("align-top", className)} {...props} />
@@ -171,7 +171,7 @@ const MARKDOWN_TABLE_COMPONENTS: Components = {
   th: ({ node: _node, className, children, ...props }) => (
     <th
       className={cn(
-        "border border-slate-200 px-3 py-2 text-left text-xs font-semibold",
+        "border border-[color:var(--border)] px-3 py-2 text-left text-xs font-semibold",
         className,
       )}
       {...props}
@@ -181,7 +181,7 @@ const MARKDOWN_TABLE_COMPONENTS: Components = {
   ),
   td: ({ node: _node, className, children, ...props }) => (
     <td
-      className={cn("border border-slate-200 px-3 py-2 align-top", className)}
+      className={cn("border border-[color:var(--border)] px-3 py-2 align-top", className)}
       {...props}
     >
       {renderMentions(children)}
