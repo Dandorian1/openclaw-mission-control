@@ -159,6 +159,15 @@ type Approval = ApprovalRead & { status: string };
 
 type BoardChatMessage = BoardMemoryRead;
 
+type MessageUsage = {
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cost?: number | null;
+  context_pct?: number | null;
+  model?: string | null;
+};
+
 type LiveFeedEventType =
   | "task.comment"
   | "task.created"
@@ -623,21 +632,67 @@ TaskCommentCard.displayName = "TaskCommentCard";
 const ChatMessageCard = memo(function ChatMessageCard({
   message,
   fallbackSource,
+  showMetadata = false,
+  sessionModel,
 }: {
   message: BoardChatMessage;
   fallbackSource: string;
+  showMetadata?: boolean;
+  sessionModel?: string;
 }) {
   const sourceLabel = resolveHumanActorName(message.source, fallbackSource);
+  const usage = (message as BoardChatMessage & { usage?: MessageUsage }).usage;
+
   return (
-    <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-muted)]/60 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-strong">{sourceLabel}</p>
-        <span className="text-xs text-quiet">
-          {formatShortTimestamp(message.created_at)}
-        </span>
-      </div>
-      <div className="mt-2 select-text cursor-text text-sm leading-relaxed text-strong break-words">
-        <Markdown content={message.content} variant="basic" />
+    <div className={cn("chat-msg-group", showMetadata && "chat-msg-group--meta-always")}>
+      <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-muted)]/60 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-strong">{sourceLabel}</p>
+          <span className="text-xs text-quiet">
+            {formatShortTimestamp(message.created_at)}
+          </span>
+        </div>
+        <div className="mt-2 select-text cursor-text text-sm leading-relaxed text-strong break-words">
+          <Markdown content={message.content} variant="basic" />
+        </div>
+        {usage ? (
+          <div className="chat-msg-meta mt-2 flex flex-wrap items-center gap-3 text-[11px] text-muted">
+            <span
+              className="cursor-help"
+              title={`Input: ${usage.input_tokens.toLocaleString()} tokens · Output: ${usage.output_tokens.toLocaleString()} tokens`}
+            >
+              {(usage.input_tokens + usage.output_tokens).toLocaleString()} tokens
+            </span>
+            {usage.cost != null ? (
+              <span
+                className="cursor-help text-[color:var(--success)]"
+                title="Estimated cost for this message (input + output tokens at current model pricing)"
+              >
+                ${usage.cost.toFixed(4)}
+              </span>
+            ) : null}
+            {usage.context_pct != null ? (
+              <span
+                className={cn(
+                  "cursor-help",
+                  usage.context_pct >= 90
+                    ? "text-[color:var(--danger)]"
+                    : usage.context_pct >= 70
+                      ? "text-[color:var(--warning)]"
+                      : "text-quiet",
+                )}
+                title={`Context window usage: ${usage.context_pct}% of model limit consumed`}
+              >
+                {usage.context_pct}% ctx
+              </span>
+            ) : null}
+            {usage.model && usage.model !== sessionModel ? (
+              <span className="rounded bg-[color:var(--surface-strong)] px-1.5 py-0.5 font-mono">
+                {usage.model}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -895,6 +950,25 @@ export default function BoardDetailPage() {
   const [chatMessages, setChatMessages] = useState<BoardChatMessage[]>([]);
   const [isChatSending, setIsChatSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [showChatMetadata, setShowChatMetadata] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem("chat-show-metadata") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const toggleChatMetadata = useCallback(() => {
+    setShowChatMetadata((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem("chat-show-metadata", String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
   const chatMessagesRef = useRef<BoardChatMessage[]>([]);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const [isAgentsControlDialogOpen, setIsAgentsControlDialogOpen] =
@@ -2165,6 +2239,24 @@ export default function BoardDetailPage() {
     () => agents.filter((agent) => !agent.is_board_lead),
     [agents],
   );
+  const sessionStats = useMemo(() => {
+    // Phase 2: filter messages that carry usage data (populated once API exposes usage fields)
+    const withUsage = chatMessages.filter(
+      (m) => (m as BoardChatMessage & { usage?: MessageUsage }).usage,
+    );
+    if (!withUsage.length) return null;
+    return {
+      totalTokens: withUsage.reduce(
+        (s, m) => s + ((m as BoardChatMessage & { usage?: MessageUsage }).usage?.total_tokens ?? 0),
+        0,
+      ),
+      totalCost: withUsage.reduce(
+        (s, m) => s + ((m as BoardChatMessage & { usage?: MessageUsage }).usage?.cost ?? 0),
+        0,
+      ),
+    };
+  }, [chatMessages]);
+
   const boardChatMentionSuggestions = useMemo(() => {
     const options = new Set<string>(["lead"]);
     agents.forEach((agent) => {
@@ -4017,6 +4109,29 @@ export default function BoardDetailPage() {
             </button>
           </div>
           <div className="flex flex-1 flex-col overflow-hidden px-6 py-4">
+            {/* Chat panel header with metadata toggle */}
+            <div className="mb-2 flex items-center justify-between border-b border-[color:var(--border)] pb-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+                Board Chat
+              </span>
+              <div className="flex items-center gap-3">
+                {showChatMetadata && sessionStats ? (
+                  <span className="text-xs text-quiet">
+                    Session: {sessionStats.totalTokens.toLocaleString()} tokens
+                    {" · "}
+                    ${sessionStats.totalCost.toFixed(4)}
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={toggleChatMetadata}
+                  className="text-xs text-muted transition-colors hover:text-strong"
+                >
+                  {showChatMetadata ? "Hide metadata" : "Show metadata"}
+                </button>
+              </div>
+            </div>
+
             <div className="flex-1 space-y-4 overflow-y-auto rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
               {chatError ? (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -4033,6 +4148,7 @@ export default function BoardDetailPage() {
                     key={message.id}
                     message={message}
                     fallbackSource={currentUserDisplayName}
+                    showMetadata={showChatMetadata}
                   />
                 ))
               )}

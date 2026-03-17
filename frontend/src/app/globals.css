@@ -164,6 +164,18 @@ body {
   }
 }
 
+/* Chat message metadata — progressive disclosure (hover-to-reveal) */
+.chat-msg-group .chat-msg-meta {
+  opacity: 0;
+  transition: opacity 150ms ease;
+  pointer-events: none;
+}
+.chat-msg-group:hover .chat-msg-meta,
+.chat-msg-group--meta-always .chat-msg-meta {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .landing-page {
   font-family: var(--font-body), sans-serif;
 }
