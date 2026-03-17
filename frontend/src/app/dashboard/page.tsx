@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { type KeyboardEvent, type MouseEvent, useMemo } from "react";
+import { type KeyboardEvent, type MouseEvent, useEffect, useRef, useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -12,6 +12,7 @@ import {
   Activity,
   ArrowUpRight,
   Bot,
+  ChevronDown,
   Info,
   LayoutGrid,
   Shield,
@@ -363,48 +364,66 @@ const toSessionSummaries = (
   });
 };
 
+function PendingApprovalsSkeleton() {
+  const timeoutMs = 10_000;
+  const [timedOut, setTimedOut] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setTimedOut(false);
+    timerRef.current = setTimeout(() => setTimedOut(true), timeoutMs);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [retryKey]);
+
+  if (timedOut) {
+    return (
+      <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-3 text-sm text-muted">
+        <p>Could not load approvals.</p>
+        <button
+          type="button"
+          onClick={() => setRetryKey((k) => k + 1)}
+          className="mt-1 text-[color:var(--accent)] underline-offset-2 hover:underline"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 px-1 py-0.5" aria-label="Loading pending approvals" aria-busy>
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          className="h-4 animate-progress-shimmer rounded bg-[color:var(--surface-strong)]"
+          style={{ width: i === 2 ? "60%" : "100%" }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function TopMetricCard({
   title,
   value,
   secondary,
-  infoText,
   icon,
-  accent,
 }: {
   title: string;
   value: string;
   secondary?: string;
-  infoText?: string;
   icon: React.ReactNode;
-  accent: "blue" | "green" | "violet" | "emerald";
 }) {
-  const iconTone =
-    accent === "blue"
-      ? "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300"
-      : accent === "green"
-        ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300"
-        : accent === "violet"
-          ? "bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300"
-          : "bg-green-50 text-green-600 dark:bg-green-500/15 dark:text-green-300";
-
   return (
     <section className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:p-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-1.5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-              {title}
-            </p>
-            {infoText ? (
-              <span
-                className="inline-flex text-quiet"
-                title={infoText}
-                aria-label={infoText}
-              >
-                <Info className="h-3.5 w-3.5" />
-              </span>
-            ) : null}
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+            {title}
+          </p>
           <div className="mt-2 flex items-end gap-2">
             <p className="font-heading text-4xl font-bold text-strong">{value}</p>
             {secondary ? (
@@ -412,7 +431,7 @@ function TopMetricCard({
             ) : null}
           </div>
         </div>
-        <div className={`rounded-lg p-2 ${iconTone}`}>
+        <div className="rounded-lg bg-[color:var(--accent-soft)] p-2 text-[color:var(--accent)]">
           {icon}
         </div>
       </div>
@@ -480,6 +499,96 @@ function InfoBlock({
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+const GATEWAY_CARD_STORAGE_KEY = "dashboard-gateway-card-expanded";
+
+function GatewayHealthCard({
+  statusLabel,
+  badgeTone,
+  rows,
+}: {
+  statusLabel: string;
+  badgeTone: "online" | "offline" | "neutral";
+  rows: SummaryRow[];
+}) {
+  const isConnected = badgeTone === "online";
+
+  const [expanded, setExpanded] = useState<boolean>(() => {
+    if (typeof window === "undefined") return !isConnected;
+    try {
+      const stored = window.localStorage.getItem(GATEWAY_CARD_STORAGE_KEY);
+      if (stored !== null) return stored === "true";
+    } catch {
+      // localStorage unavailable
+    }
+    return !isConnected;
+  });
+
+  const toggle = () => {
+    setExpanded((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(GATEWAY_CARD_STORAGE_KEY, String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  const badgeClass =
+    badgeTone === "online"
+      ? "bg-emerald-100 text-emerald-700"
+      : badgeTone === "offline"
+        ? "bg-rose-100 text-rose-700"
+        : "bg-[color:var(--surface-strong)] text-strong";
+
+  return (
+    <section className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] shadow-sm">
+      <button
+        type="button"
+        onClick={toggle}
+        className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl px-4 py-3 transition hover:bg-[color:var(--surface-muted)] md:px-6"
+        aria-expanded={expanded}
+        aria-controls="gateway-health-details"
+      >
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-strong">Gateway Health</h3>
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${badgeClass}`}>
+            {statusLabel}
+          </span>
+        </div>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-quiet transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+        />
+      </button>
+      {expanded ? (
+        <div id="gateway-health-details" className="px-4 pb-4 md:px-6 md:pb-6">
+          <div className="divide-y divide-[color:var(--border)] rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)]">
+            {rows.map((row) => (
+              <div key={`${row.label}-${row.value}`} className="flex items-start justify-between gap-3 px-3 py-2">
+                <span className="min-w-0 text-sm text-muted">{row.label}</span>
+                <span
+                  className={`max-w-[65%] break-words text-right text-sm font-medium leading-5 ${
+                    row.tone === "success"
+                      ? "text-emerald-700"
+                      : row.tone === "warning"
+                        ? "text-amber-700"
+                        : row.tone === "danger"
+                          ? "text-rose-700"
+                          : "text-strong"
+                  }`}
+                >
+                  {row.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -911,6 +1020,9 @@ export default function DashboardPage() {
         <DashboardSidebar />
         <main className="flex-1 overflow-y-auto bg-app">
           <div className="p-4 md:p-8">
+            <h1 className="mb-4 text-2xl font-semibold tracking-tight text-strong">
+              Dashboard
+            </h1>
             {metricsQuery.error ? (
               <div className="mb-4 rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-700">
                 Load failed: {metricsQuery.error.message}
@@ -923,29 +1035,24 @@ export default function DashboardPage() {
                 value={formatCount(activeAgentsMetric)}
                 secondary={`${formatCount(agents.length)} total`}
                 icon={<Bot className="h-4 w-4" />}
-                accent="blue"
               />
               <TopMetricCard
                 title="Tasks In Progress"
                 value={formatCount(tasksInProgressMetric)}
                 secondary={`${formatCount(tasksTotal)} total`}
                 icon={<LayoutGrid className="h-4 w-4" />}
-                accent="green"
               />
               <TopMetricCard
                 title="Error Rate"
                 value={formatPercent(errorRateMetric)}
                 secondary={`${formatCount(Number(latestThroughputPoint?.value ?? 0))} completed (latest)`}
                 icon={<Activity className="h-4 w-4" />}
-                accent="violet"
               />
               <TopMetricCard
                 title="Completion Speed"
                 value={formatPerDay(throughputTotal, DASHBOARD_RANGE_DAYS)}
                 secondary={`${formatCount(throughputTotal)} completed`}
-                infoText={`Based on ${DASHBOARD_RANGE_LABEL}`}
                 icon={<Timer className="h-4 w-4" />}
-                accent="emerald"
               />
             </div>
 
@@ -956,15 +1063,11 @@ export default function DashboardPage() {
               />
               <InfoBlock
                 title="Throughput"
-                infoText={`All throughput values are calculated for ${DASHBOARD_RANGE_LABEL}`}
                 rows={throughputRows}
               />
-              <InfoBlock
-                title="Gateway Health"
-                badge={{
-                  text: gatewayStatusLabel,
-                  tone: gatewayBadgeTone,
-                }}
+              <GatewayHealthCard
+                statusLabel={gatewayStatusLabel}
+                badgeTone={gatewayBadgeTone}
                 rows={gatewayRows}
               />
             </div>
@@ -982,9 +1085,7 @@ export default function DashboardPage() {
               </div>
 
               {!metrics && metricsQuery.isLoading ? (
-                <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-3 text-sm text-muted">
-                  Loading pending approvals...
-                </div>
+                <PendingApprovalsSkeleton />
               ) : !metrics && metricsQuery.error ? (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-500/15 dark:text-amber-200">
                   Pending approvals are temporarily unavailable.
@@ -1035,7 +1136,14 @@ export default function DashboardPage() {
                 <div className="max-h-[310px] space-y-2 overflow-x-hidden overflow-y-auto pr-1">
                   {!hasConfiguredGateways ? (
                     <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-3 text-sm text-muted">
-                      No gateways are configured for any board yet.
+                      <p>No gateways are configured for any board yet.</p>
+                      <Link
+                        href="/gateways/new"
+                        className="mt-2 inline-flex items-center gap-1 text-[color:var(--accent)] underline-offset-2 hover:underline"
+                      >
+                        Configure a gateway
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      </Link>
                     </div>
                   ) : gatewayStatusesQuery.isLoading ? (
                     <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-3 text-sm text-muted">
