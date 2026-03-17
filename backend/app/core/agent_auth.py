@@ -11,13 +11,36 @@ Key ideas:
 
 This is intentionally separate from user authentication (Clerk/local bearer token)
 so we can evolve agent policy independently.
+
+Performance note
+----------------
+Token verification is PBKDF2-SHA256 at 200k iterations — intentionally slow for
+storage security. The previous O(N) scan (verify every agent's hash until one
+matches) was a DoS vector: N agents × ~200ms each = linear cost per request.
+
+Fix: an in-process LRU+TTL cache maps a fast HMAC-SHA256 of the raw token to the
+matching agent_id.  On a cache hit we still do ONE PBKDF2 verify against just that
+agent's stored hash (correctness + revocation check).  On a miss we fall back to the
+full scan and populate the cache if a match is found.
+
+Cache properties:
+- Key:   HMAC-SHA256(token, _CACHE_KEY_SECRET) — collision-safe, non-reversible
+- Value: agent_id UUID (or sentinel _CACHE_MISS if the token was invalid)
+- TTL:   60 s — revoked/rotated tokens stop working within one minute
+- Size:  1 024 entries — bounded memory footprint; evicts oldest on overflow
 """
 
 from __future__ import annotations
 
+import hashlib
+import hmac as _hmac
+import secrets
+import threading
+import time
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING, Literal
+from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException, Request, status
 from sqlmodel import col, select
@@ -37,6 +60,64 @@ logger = get_logger(__name__)
 
 _LAST_SEEN_TOUCH_INTERVAL = timedelta(seconds=30)
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+# ---------------------------------------------------------------------------
+# Token → agent_id LRU+TTL cache
+# ---------------------------------------------------------------------------
+
+_CACHE_TTL_SECONDS: float = 60.0
+_CACHE_MAX_SIZE: int = 1024
+_CACHE_KEY_SECRET: bytes = secrets.token_bytes(32)  # per-process, not persisted
+
+# Sentinel: token was looked up and found NO matching agent
+_CACHE_MISS = object()
+
+# Cache: { cache_key: (value, expiry_monotonic) }
+# value is either a UUID (agent_id) or _CACHE_MISS
+_token_cache: dict[str, tuple[object, float]] = {}
+_token_cache_lock = threading.Lock()
+
+
+def _make_cache_key(raw_token: str) -> str:
+    """Derive a non-reversible, collision-resistant cache key from a raw token."""
+    return _hmac.new(
+        _CACHE_KEY_SECRET,
+        raw_token.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _cache_get(cache_key: str) -> object | None:
+    """Return the cached value for *cache_key*, or None on miss / expiry."""
+    with _token_cache_lock:
+        entry = _token_cache.get(cache_key)
+    if entry is None:
+        return None
+    value, expiry = entry
+    if time.monotonic() > expiry:
+        with _token_cache_lock:
+            _token_cache.pop(cache_key, None)
+        return None
+    return value
+
+
+def _cache_put(cache_key: str, value: object) -> None:
+    """Insert or update *cache_key* → *value* with a fresh TTL."""
+    expiry = time.monotonic() + _CACHE_TTL_SECONDS
+    with _token_cache_lock:
+        # Evict oldest entry when at capacity
+        if len(_token_cache) >= _CACHE_MAX_SIZE and cache_key not in _token_cache:
+            oldest_key = next(iter(_token_cache))
+            _token_cache.pop(oldest_key, None)
+        _token_cache[cache_key] = (value, expiry)
+
+
+def _cache_invalidate(agent_id: UUID) -> None:
+    """Remove any cached entry that maps to *agent_id* (call after token rotation)."""
+    with _token_cache_lock:
+        to_remove = [k for k, (v, _) in _token_cache.items() if v == agent_id]
+        for k in to_remove:
+            del _token_cache[k]
 SESSION_DEP = Depends(get_session)
 
 
@@ -49,6 +130,40 @@ class AgentAuthContext:
 
 
 async def _find_agent_for_token(session: AsyncSession, token: str) -> Agent | None:
+    """Look up the agent that owns *token*.
+
+    Fast path (cache hit):
+        1. Derive cache key (HMAC-SHA256, cheap).
+        2. If cached → fetch that specific agent from DB.
+        3. Run ONE PBKDF2 verify to confirm token is still valid and not rotated.
+        4. Return agent on success; evict stale cache entry on failure.
+
+    Slow path (cache miss):
+        1. Scan all agents with a token hash (original O(N) behaviour).
+        2. On match → populate cache and return.
+        3. On no match → cache the miss to avoid repeated scans for bad tokens.
+    """
+    cache_key = _make_cache_key(token)
+    cached = _cache_get(cache_key)
+
+    if cached is not None:
+        if cached is _CACHE_MISS:
+            return None
+        # cached holds an agent_id UUID — verify it's still valid
+        agent_id = cached
+        result = await session.exec(
+            select(Agent).where(col(Agent.id) == agent_id),
+        )
+        agent = result.first()
+        if agent is not None and agent.agent_token_hash and verify_agent_token(
+            token, agent.agent_token_hash
+        ):
+            return agent
+        # Token was rotated or agent deleted — evict and fall through to slow path
+        with _token_cache_lock:
+            _token_cache.pop(cache_key, None)
+
+    # Slow path: full scan (O(N) PBKDF2 — only runs on genuine cache miss)
     agents = list(
         await session.exec(
             select(Agent).where(col(Agent.agent_token_hash).is_not(None)),
@@ -56,7 +171,11 @@ async def _find_agent_for_token(session: AsyncSession, token: str) -> Agent | No
     )
     for agent in agents:
         if agent.agent_token_hash and verify_agent_token(token, agent.agent_token_hash):
+            _cache_put(cache_key, agent.id)
             return agent
+
+    # No matching agent — cache the miss to short-circuit future bad-token attempts
+    _cache_put(cache_key, _CACHE_MISS)
     return None
 
 

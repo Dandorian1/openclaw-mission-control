@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from app.core.agent_auth import _cache_invalidate as _invalidate_token_cache
 from app.core.agent_tokens import generate_agent_token, hash_agent_token
 from app.core.time import utcnow
 from app.models.agents import Agent
@@ -18,8 +19,13 @@ def ensure_heartbeat_config(agent: Agent) -> None:
 
 
 def mint_agent_token(agent: Agent) -> str:
-    """Generate a new raw token and update the agent's token hash."""
+    """Generate a new raw token and update the agent's token hash.
 
+    Also evicts any cached auth-token entry for this agent so the old token
+    stops working immediately rather than serving from cache until TTL expiry.
+    """
+    if agent.id is not None:
+        _invalidate_token_cache(agent.id)
     raw_token = generate_agent_token()
     agent.agent_token_hash = hash_agent_token(raw_token)
     return raw_token
