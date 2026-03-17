@@ -223,6 +223,28 @@ def _guard_board_access(agent_ctx: AgentAuthContext, board: Board) -> None:
     OpenClawAuthorizationPolicy.require_board_write_access(allowed=allowed)
 
 
+def _guard_lead_cross_board_access(agent_ctx: AgentAuthContext, board: Board) -> None:
+    """Board-access guard for lead-only endpoints that permit cross-board targeting.
+
+    Rules:
+    - A board-lead agent may target any board that shares the same gateway, regardless
+      of whether it is the agent's own board.
+    - A non-lead (worker) agent is restricted to its own board as before.
+    - A gateway-level agent (board_id=None) passes through unchanged.
+
+    This deliberately does NOT call _guard_board_access for leads so they can create
+    tasks on the QA board or any other board in the same deployment.
+    """
+    agent = agent_ctx.agent
+    if agent.is_board_lead:
+        # Lead agents: require same gateway scope only.
+        same_gateway = board.gateway_id == agent.gateway_id
+        OpenClawAuthorizationPolicy.require_board_write_access(allowed=same_gateway)
+    else:
+        # Worker agents: keep the existing board-local restriction.
+        _guard_board_access(agent_ctx, board)
+
+
 def _require_board_lead(agent_ctx: AgentAuthContext) -> Agent:
     return OpenClawAuthorizationPolicy.require_board_lead_actor(
         actor_agent=agent_ctx.agent,
@@ -788,7 +810,7 @@ async def create_task(
     Lead-only endpoint. Supports dependency-aware creation via
     `depends_on_task_ids`, optional `tag_ids`, and `custom_field_values`.
     """
-    _guard_board_access(agent_ctx, board)
+    _guard_lead_cross_board_access(agent_ctx, board)
     _require_board_lead(agent_ctx)
     data = payload.model_dump(
         exclude={"depends_on_task_ids", "tag_ids", "custom_field_values"},
