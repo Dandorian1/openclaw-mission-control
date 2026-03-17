@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     security_header_x_frame_options: str = "DENY"
     security_header_referrer_policy: str = "strict-origin-when-cross-origin"
     security_header_permissions_policy: str = ""
+    # Content-Security-Policy: blank by default (each deployment must tune its own
+    # allowed sources). Set via SECURITY_HEADER_CONTENT_SECURITY_POLICY env var.
+    security_header_content_security_policy: str = ""
+    # Strict-Transport-Security: blank by default so HTTP-only local dev is not broken.
+    # Set to e.g. "max-age=31536000; includeSubDomains" in production .env.
+    security_header_strict_transport_security: str = ""
 
     # Webhook payload size limit in bytes (default 1 MB).
     webhook_max_payload_bytes: int = 1_048_576
@@ -144,11 +150,11 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         """Return True when running in a production environment.
 
-        The ``ENVIRONMENT`` variable must be set to ``"production"`` (case-insensitive)
-        to be considered production. All other values (e.g. ``"dev"``, ``"staging"``,
-        ``"test"``) are treated as non-production.
+        The ``ENVIRONMENT`` variable must be set to ``"production"`` or ``"prod"``
+        (case-insensitive) to be considered production. All other values (e.g.
+        ``"dev"``, ``"staging"``, ``"test"``) are treated as non-production.
         """
-        return self.environment.strip().lower() == "production"
+        return self.environment.strip().lower() in {"production", "prod"}
 
 
 settings = Settings()

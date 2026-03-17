@@ -145,3 +145,98 @@ def test_security_headers_middleware_skips_blank_config_values() -> None:
     assert response.headers.get("x-frame-options") is None
     assert response.headers.get("referrer-policy") is None
     assert response.headers.get("permissions-policy") is None
+    assert response.headers.get("content-security-policy") is None
+    assert response.headers.get("strict-transport-security") is None
+
+
+def test_security_headers_middleware_injects_csp() -> None:
+    csp = "default-src 'self'; script-src 'self'; frame-ancestors 'none'"
+    app = FastAPI()
+    app.add_middleware(SecurityHeadersMiddleware, content_security_policy=csp)
+
+    @app.get("/ok")
+    def ok() -> dict[str, bool]:
+        return {"ok": True}
+
+    response = TestClient(app).get("/ok")
+
+    assert response.status_code == 200
+    assert response.headers["content-security-policy"] == csp
+
+
+def test_security_headers_middleware_injects_hsts() -> None:
+    hsts = "max-age=31536000; includeSubDomains"
+    app = FastAPI()
+    app.add_middleware(SecurityHeadersMiddleware, strict_transport_security=hsts)
+
+    @app.get("/ok")
+    def ok() -> dict[str, bool]:
+        return {"ok": True}
+
+    response = TestClient(app).get("/ok")
+
+    assert response.status_code == 200
+    assert response.headers["strict-transport-security"] == hsts
+
+
+def test_security_headers_middleware_injects_all_six_headers() -> None:
+    app = FastAPI()
+    app.add_middleware(
+        SecurityHeadersMiddleware,
+        x_content_type_options="nosniff",
+        x_frame_options="DENY",
+        referrer_policy="strict-origin-when-cross-origin",
+        permissions_policy="",
+        content_security_policy="default-src 'self'",
+        strict_transport_security="max-age=31536000; includeSubDomains",
+    )
+
+    @app.get("/ok")
+    def ok() -> dict[str, bool]:
+        return {"ok": True}
+
+    response = TestClient(app).get("/ok")
+
+    assert response.status_code == 200
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+    assert response.headers.get("permissions-policy") is None  # blank → omitted
+    assert response.headers["content-security-policy"] == "default-src 'self'"
+    assert response.headers["strict-transport-security"] == "max-age=31536000; includeSubDomains"
+
+
+def test_security_headers_middleware_does_not_override_existing_csp() -> None:
+    app = FastAPI()
+    app.add_middleware(
+        SecurityHeadersMiddleware,
+        content_security_policy="default-src 'self'",
+    )
+
+    @app.get("/custom-csp")
+    def custom_csp(response: Response) -> dict[str, bool]:
+        response.headers["Content-Security-Policy"] = "default-src 'none'"
+        return {"ok": True}
+
+    response = TestClient(app).get("/custom-csp")
+
+    assert response.status_code == 200
+    assert response.headers["content-security-policy"] == "default-src 'none'"
+
+
+def test_security_headers_middleware_does_not_override_existing_hsts() -> None:
+    app = FastAPI()
+    app.add_middleware(
+        SecurityHeadersMiddleware,
+        strict_transport_security="max-age=31536000; includeSubDomains",
+    )
+
+    @app.get("/custom-hsts")
+    def custom_hsts(response: Response) -> dict[str, bool]:
+        response.headers["Strict-Transport-Security"] = "max-age=60"
+        return {"ok": True}
+
+    response = TestClient(app).get("/custom-hsts")
+
+    assert response.status_code == 200
+    assert response.headers["strict-transport-security"] == "max-age=60"

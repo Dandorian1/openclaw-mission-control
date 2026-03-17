@@ -9,12 +9,27 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 class SecurityHeadersMiddleware:
-    """Inject configured security headers into every HTTP response."""
+    """Inject configured security headers into every HTTP response.
+
+    Supported headers (all opt-in via non-blank constructor arguments):
+
+    - ``x_content_type_options`` → ``X-Content-Type-Options``
+    - ``x_frame_options``        → ``X-Frame-Options``
+    - ``referrer_policy``        → ``Referrer-Policy``
+    - ``permissions_policy``     → ``Permissions-Policy``
+    - ``content_security_policy``→ ``Content-Security-Policy``
+    - ``strict_transport_security`` → ``Strict-Transport-Security``
+
+    Blank (or whitespace-only) values disable the corresponding header.
+    Headers already set by the application are never overridden.
+    """
 
     _X_CONTENT_TYPE_OPTIONS = b"x-content-type-options"
     _X_FRAME_OPTIONS = b"x-frame-options"
     _REFERRER_POLICY = b"referrer-policy"
     _PERMISSIONS_POLICY = b"permissions-policy"
+    _CONTENT_SECURITY_POLICY = b"content-security-policy"
+    _STRICT_TRANSPORT_SECURITY = b"strict-transport-security"
 
     def __init__(
         self,
@@ -24,6 +39,8 @@ class SecurityHeadersMiddleware:
         x_frame_options: str = "",
         referrer_policy: str = "",
         permissions_policy: str = "",
+        content_security_policy: str = "",
+        strict_transport_security: str = "",
     ) -> None:
         self._app = app
         self._configured_headers = self._build_configured_headers(
@@ -31,6 +48,8 @@ class SecurityHeadersMiddleware:
             x_frame_options=x_frame_options,
             referrer_policy=referrer_policy,
             permissions_policy=permissions_policy,
+            content_security_policy=content_security_policy,
+            strict_transport_security=strict_transport_security,
         )
 
     @classmethod
@@ -41,6 +60,8 @@ class SecurityHeadersMiddleware:
         x_frame_options: str,
         referrer_policy: str,
         permissions_policy: str,
+        content_security_policy: str,
+        strict_transport_security: str,
     ) -> tuple[tuple[bytes, bytes, bytes], ...]:
         configured: list[tuple[bytes, bytes, bytes]] = []
         for header_name, value in (
@@ -48,6 +69,8 @@ class SecurityHeadersMiddleware:
             (cls._X_FRAME_OPTIONS, x_frame_options),
             (cls._REFERRER_POLICY, referrer_policy),
             (cls._PERMISSIONS_POLICY, permissions_policy),
+            (cls._CONTENT_SECURITY_POLICY, content_security_policy),
+            (cls._STRICT_TRANSPORT_SECURITY, strict_transport_security),
         ):
             normalized = value.strip()
             if not normalized:

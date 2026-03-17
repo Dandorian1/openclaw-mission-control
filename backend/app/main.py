@@ -478,6 +478,8 @@ app.add_middleware(
     x_frame_options=settings.security_header_x_frame_options,
     referrer_policy=settings.security_header_referrer_policy,
     permissions_policy=settings.security_header_permissions_policy,
+    content_security_policy=settings.security_header_content_security_policy,
+    strict_transport_security=settings.security_header_strict_transport_security,
 )
 install_error_handling(app)
 
