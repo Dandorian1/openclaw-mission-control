@@ -49,6 +49,7 @@ import {
   formatTimestamp,
   parseTimestamp,
 } from "@/lib/formatters";
+import { resolveSessionModelDisplay } from "@/lib/session-model";
 
 type SessionSummary = {
   key: string;
@@ -267,8 +268,19 @@ const toSessionSummaries = (
       "kind",
       "chatType",
     ]);
-    const model = readString(entry, ["model", "model_name", "provider", "engine"]);
-    const modelProvider = readString(entry, ["modelProvider", "model_provider", "provider"]);
+    const model = resolveSessionModelDisplay({
+      model: readString(entry, ["model"]),
+      model_name: readString(entry, ["model_name"]),
+      modelOverride: readString(entry, ["modelOverride"]),
+      model_override: readString(entry, ["model_override"]),
+      modelId: readString(entry, ["modelId"]),
+      model_id: readString(entry, ["model_id"]),
+      modelProvider: readString(entry, ["modelProvider"]),
+      model_provider: readString(entry, ["model_provider"]),
+      provider: readString(entry, ["provider"]),
+      providerOverride: readString(entry, ["providerOverride"]),
+      provider_override: readString(entry, ["provider_override"]),
+    });
     const lastSeenAt = readTimestampFromRecords(candidateRecords, [
       "updated_at",
       "updatedAt",
@@ -337,14 +349,11 @@ const toSessionSummaries = (
 
     const subtitleBits = [channel, model].filter(Boolean) as string[];
     const subtitle = subtitleBits.length > 0 ? subtitleBits.join(" · ") : "Session";
-    const modelWithProvider =
-      modelProvider && model && modelProvider !== model ? `${model} · ${modelProvider}` : model;
-    const subtitleWithProvider = [channel, modelWithProvider].filter(Boolean).join(" · ");
 
     return {
       key,
       title: label,
-      subtitle: subtitleWithProvider || subtitle,
+      subtitle,
       usage,
       lastSeenAt,
       isMain:
