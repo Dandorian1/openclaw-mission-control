@@ -9,11 +9,22 @@ import secrets
 
 ITERATIONS = 200_000
 SALT_BYTES = 16
+TOKEN_PREFIX_LENGTH = 8
 
 
 def generate_agent_token() -> str:
     """Generate a new URL-safe random token for an agent."""
     return secrets.token_urlsafe(32)
+
+
+def token_prefix(token: str) -> str:
+    """Return the fixed-length prefix used for indexed lookup.
+
+    The prefix is the first ``TOKEN_PREFIX_LENGTH`` characters of the raw
+    token.  It is stored in plain text and used to narrow the database query
+    to a single row before the expensive PBKDF2 verify step.
+    """
+    return token[:TOKEN_PREFIX_LENGTH]
 
 
 def _b64encode(value: bytes) -> str:
