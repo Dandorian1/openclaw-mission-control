@@ -3188,7 +3188,7 @@ export default function BoardDetailPage() {
         <DashboardSidebar />
         <main
           className={cn(
-            "flex-1 bg-gradient-to-br from-slate-50 to-slate-100",
+            "flex-1 bg-app",
             isSidePanelOpen ? "overflow-hidden" : "overflow-y-auto",
           )}
         >
@@ -3216,7 +3216,7 @@ export default function BoardDetailPage() {
                         "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                         viewMode === "board"
                           ? "bg-slate-900 text-white"
-                          : "text-muted hover:bg-slate-200 hover:text-strong",
+                          : "text-muted hover:bg-[color:var(--surface-strong)] hover:text-strong",
                       )}
                       onClick={() => setViewMode("board")}
                     >
@@ -3227,7 +3227,7 @@ export default function BoardDetailPage() {
                         "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                         viewMode === "list"
                           ? "bg-slate-900 text-white"
-                          : "text-muted hover:bg-slate-200 hover:text-strong",
+                          : "text-muted hover:bg-[color:var(--surface-strong)] hover:text-strong",
                       )}
                       onClick={() => setViewMode("list")}
                     >
