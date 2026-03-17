@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Literal
 from fastapi import Depends, Header, HTTPException, Request, status
 from sqlmodel import col, select
 
-from app.core.agent_tokens import token_prefix, verify_agent_token
+from app.core.agent_tokens import verify_agent_token
 from app.core.client_ip import get_client_ip
 from app.core.logging import get_logger
 from app.core.rate_limit import agent_auth_limiter
@@ -49,49 +49,14 @@ class AgentAuthContext:
 
 
 async def _find_agent_for_token(session: AsyncSession, token: str) -> Agent | None:
-    """Locate the agent whose stored hash matches *token*.
-
-    Fast path (O(1)):
-        Filter by ``agent_token_prefix`` (indexed) before running the
-        expensive PBKDF2 verify.  Agents provisioned after the
-        ``agent_token_prefix`` column was added will always hit this path.
-
-    Legacy path (O(n), degraded):
-        Agents provisioned before the column was added have
-        ``agent_token_prefix = NULL``.  We scan only that subset and, on a
-        match, back-fill the prefix so subsequent requests use the fast path.
-    """
-    prefix = token_prefix(token)
-
-    # --- Fast path: indexed prefix lookup ---
-    candidates = list(
+    agents = list(
         await session.exec(
-            select(Agent).where(
-                col(Agent.agent_token_prefix) == prefix,
-                col(Agent.agent_token_hash).is_not(None),
-            ),
+            select(Agent).where(col(Agent.agent_token_hash).is_not(None)),
         ),
     )
-    for agent in candidates:
+    for agent in agents:
         if agent.agent_token_hash and verify_agent_token(token, agent.agent_token_hash):
             return agent
-
-    # --- Legacy path: agents with no prefix stored ---
-    legacy_agents = list(
-        await session.exec(
-            select(Agent).where(
-                col(Agent.agent_token_prefix).is_(None),
-                col(Agent.agent_token_hash).is_not(None),
-            ),
-        ),
-    )
-    for agent in legacy_agents:
-        if agent.agent_token_hash and verify_agent_token(token, agent.agent_token_hash):
-            # Back-fill prefix so this agent uses the fast path from now on.
-            agent.agent_token_prefix = prefix
-            session.add(agent)
-            return agent
-
     return None
 
 
