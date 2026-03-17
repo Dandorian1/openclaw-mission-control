@@ -122,15 +122,21 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
                 autoFocus
                 disabled={isValidating}
                 className="font-mono"
+                hasError={!!error}
+                aria-describedby={error ? "local-auth-error" : undefined}
               />
             </div>
             {error ? (
-              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <p
+                id="local-auth-error"
+                role="alert"
+                className="rounded-lg border border-danger bg-danger-soft px-3 py-2 text-sm text-danger"
+              >
                 {error}
               </p>
             ) : (
               <p className="text-xs text-muted">
-                Token must be at least {LOCAL_AUTH_TOKEN_MIN_LENGTH} characters.
+                Bearer token must be at least {LOCAL_AUTH_TOKEN_MIN_LENGTH} characters.
               </p>
             )}
             <Button

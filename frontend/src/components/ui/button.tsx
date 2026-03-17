@@ -18,6 +18,8 @@ const buttonVariants = cva(
           "border border-[color:var(--border-strong)] bg-transparent text-strong hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]",
         ghost:
           "bg-transparent text-strong hover:bg-[color:var(--surface-strong)]",
+        destructive:
+          "bg-[color:var(--danger)] text-white shadow-sm hover:opacity-90 focus-visible:ring-[color:var(--danger)]",
       },
       size: {
         sm: "h-9 px-4",
