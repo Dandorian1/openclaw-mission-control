@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Lock } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock } from "lucide-react";
 
 import { setLocalAuthToken } from "@/auth/localAuth";
 import { Button } from "@/components/ui/button";
@@ -48,19 +48,26 @@ const defaultOnAuthenticated = () => window.location.reload();
 
 export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
   const [token, setToken] = useState("");
+  const [showToken, setShowToken] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
+
+  const handleTokenChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setToken(event.target.value);
+    // Clear error as soon as the user edits the field
+    if (error) setError(null);
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const cleaned = token.trim();
     if (!cleaned) {
-      setError("Bearer token is required.");
+      setError("Access token is required.");
       return;
     }
     if (cleaned.length < LOCAL_AUTH_TOKEN_MIN_LENGTH) {
       setError(
-        `Bearer token must be at least ${LOCAL_AUTH_TOKEN_MIN_LENGTH} characters.`,
+        `Access token must be at least ${LOCAL_AUTH_TOKEN_MIN_LENGTH} characters.`,
       );
       return;
     }
@@ -78,6 +85,15 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
     (onAuthenticated ?? defaultOnAuthenticated)();
   };
 
+  const tokenReady = token.trim().length >= LOCAL_AUTH_TOKEN_MIN_LENGTH;
+
+  const counterClass =
+    token.length >= LOCAL_AUTH_TOKEN_MIN_LENGTH
+      ? "text-[color:var(--success)]"
+      : error
+        ? "text-[color:var(--danger)]"
+        : "text-muted";
+
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-app px-4 py-10">
       <div className="pointer-events-none absolute inset-0">
@@ -91,11 +107,20 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
             <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
               Self-host mode
             </span>
-            <div className="rounded-xl bg-[color:var(--accent-soft)] p-2 text-[color:var(--accent)]">
-              <Lock className="h-5 w-5" />
+            <div
+              className="rounded-xl bg-[color:var(--accent-soft)] p-2 text-[color:var(--accent)]"
+              title="Self-hosted secure mode"
+              aria-label="Self-hosted secure mode"
+            >
+              <Lock className="h-5 w-5" aria-hidden />
             </div>
           </div>
           <div className="space-y-1">
+            {/* Branding wordmark */}
+            <div className="mb-1 flex items-center gap-2">
+              <span className="text-base font-bold tracking-tight text-strong">OpenClaw</span>
+              <span className="text-sm text-muted">Mission Control</span>
+            </div>
             <h1 className="text-2xl font-semibold tracking-tight text-strong">
               Local Authentication
             </h1>
@@ -113,19 +138,40 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
               >
                 Access token
               </label>
-              <Input
-                id="local-auth-token"
-                type="password"
-                value={token}
-                onChange={(event) => setToken(event.target.value)}
-                placeholder="Paste token"
-                autoFocus
-                disabled={isValidating}
-                className="font-mono"
-                hasError={!!error}
-                aria-describedby={error ? "local-auth-error" : undefined}
-              />
+              {/* Show/hide toggle wrapper */}
+              <div className="relative">
+                <Input
+                  id="local-auth-token"
+                  type={showToken ? "text" : "password"}
+                  value={token}
+                  onChange={handleTokenChange}
+                  placeholder="Paste your access token"
+                  autoFocus
+                  disabled={isValidating}
+                  className="pr-10 font-mono"
+                  hasError={!!error}
+                  aria-describedby={error ? "local-auth-error" : "local-auth-hint"}
+                />
+                <button
+                  type="button"
+                  aria-label={showToken ? "Hide token" : "Show token"}
+                  onClick={() => setShowToken((v) => !v)}
+                  disabled={isValidating}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted transition hover:text-strong disabled:pointer-events-none"
+                >
+                  {showToken
+                    ? <EyeOff className="h-4 w-4" aria-hidden />
+                    : <Eye className="h-4 w-4" aria-hidden />}
+                </button>
+              </div>
+              {/* Character counter */}
+              <div className="flex justify-end">
+                <span className={`text-xs tabular-nums ${counterClass}`}>
+                  {token.length}/{LOCAL_AUTH_TOKEN_MIN_LENGTH} characters
+                </span>
+              </div>
             </div>
+
             {error ? (
               <p
                 id="local-auth-error"
@@ -135,17 +181,40 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
                 {error}
               </p>
             ) : (
-              <p className="text-xs text-muted">
-                Bearer token must be at least {LOCAL_AUTH_TOKEN_MIN_LENGTH} characters.
+              <p id="local-auth-hint" className="text-xs text-muted">
+                Access token must be at least {LOCAL_AUTH_TOKEN_MIN_LENGTH} characters.
               </p>
             )}
+
+            {/* Help link */}
+            <p className="text-xs text-muted">
+              Need help?{" "}
+              <a
+                href="https://docs.openclaw.ai/self-hosting/auth-token"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline-offset-2 hover:text-strong hover:underline"
+              >
+                How do I find my access token?
+              </a>
+            </p>
+
             <Button
               type="submit"
-              className="w-full"
+              className={`w-full transition-opacity ${
+                !tokenReady && !isValidating ? "opacity-50" : "opacity-100"
+              }`}
               size="lg"
               disabled={isValidating}
             >
-              {isValidating ? "Validating..." : "Continue"}
+              {isValidating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  Validating…
+                </>
+              ) : (
+                "Continue"
+              )}
             </Button>
           </form>
         </CardContent>
