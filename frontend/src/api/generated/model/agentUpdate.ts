@@ -32,4 +32,9 @@ export interface AgentUpdate {
    * Accepted values: 'low', 'medium', 'high', or null to clear.
    */
   model_effort_tier?: string | null;
+  /**
+   * Optional preferred model in 'provider/model' format.
+   * e.g. 'anthropic/claude-opus-4-6'. Set to null to revert to gateway default.
+   */
+  preferred_model?: string | null;
 }

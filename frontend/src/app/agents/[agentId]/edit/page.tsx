@@ -97,6 +97,9 @@ export default function EditAgentPage() {
   const [modelEffortTier, setModelEffortTier] = useState<string | undefined>(
     undefined,
   );
+  const [preferredModel, setPreferredModel] = useState<string | undefined>(
+    undefined,
+  );
   const [identityProfile, setIdentityProfile] = useState<
     IdentityProfile | undefined
   >(undefined);
@@ -183,6 +186,8 @@ export default function EditAgentPage() {
   const resolvedHeartbeatEvery = heartbeatEvery ?? loadedHeartbeat.every;
   const resolvedModelEffortTier =
     modelEffortTier ?? (loadedAgent?.model_effort_tier as string | undefined) ?? "";
+  const resolvedPreferredModel =
+    preferredModel ?? (loadedAgent?.preferred_model as string | undefined) ?? "";
   const resolvedIdentityProfile = identityProfile ?? loadedIdentityProfile;
 
   const resolvedBoardId = useMemo(() => {
@@ -237,6 +242,7 @@ export default function EditAgentPage() {
         resolvedIdentityProfile,
       ) as unknown as Record<string, unknown> | null,
       model_effort_tier: resolvedModelEffortTier.trim() || null,
+      preferred_model: resolvedPreferredModel.trim() || null,
     };
     if (!resolvedIsGatewayMain) {
       payload.board_id = resolvedBoardId || null;
@@ -408,6 +414,24 @@ export default function EditAgentPage() {
               <p className="text-xs text-muted">
                 Controls which model tier this agent uses. Leave as gateway
                 default unless this agent has specific performance needs.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-strong">
+                Specific model
+              </label>
+              <Input
+                value={resolvedPreferredModel}
+                onChange={(event) => setPreferredModel(event.target.value)}
+                placeholder="e.g. anthropic/claude-opus-4-6"
+                disabled={isLoading}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted">
+                Optional. Enter a{" "}
+                <span className="font-mono">provider/model</span> string to pin
+                this agent to a specific model. Overrides model effort tier when
+                set. Leave blank to use the gateway default.
               </p>
             </div>
           </div>

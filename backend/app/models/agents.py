@@ -54,5 +54,14 @@ class Agent(QueryModel, table=True):
         description="Preferred model effort tier for this agent: 'low', 'medium', or 'high'.",
         index=False,
     )
+    preferred_model: str | None = Field(
+        default=None,
+        description=(
+            "Preferred model string for this agent in 'provider/model' format "
+            "(e.g. 'anthropic/claude-opus-4-6'). When set, the gateway uses this "
+            "model instead of the gateway default for this agent's sessions."
+        ),
+        index=False,
+    )
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)

@@ -110,6 +110,16 @@ class AgentBase(SQLModel):
         ),
         examples=["low", "medium", "high"],
     )
+    preferred_model: str | None = Field(
+        default=None,
+        description=(
+            "Preferred model for this agent in 'provider/model' format "
+            "(e.g. 'anthropic/claude-opus-4-6'). When set, the gateway uses this "
+            "specific model for this agent's sessions instead of the gateway default. "
+            "Takes precedence over model_effort_tier when both are set."
+        ),
+        examples=["anthropic/claude-opus-4-6", "openai/gpt-4o", "anthropic/claude-sonnet-4-6"],
+    )
 
     @field_validator("identity_template", "soul_template", mode="before")
     @classmethod
@@ -138,6 +148,16 @@ class AgentBase(SQLModel):
             return stripped
         msg = "model_effort_tier must be a string"
         raise ValueError(msg)
+
+    @field_validator("preferred_model", mode="before")
+    @classmethod
+    def normalize_preferred_model(cls, value: object) -> str | None:
+        """Normalize blank preferred_model to null."""
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value.strip() or None
+        return None
 
     @field_validator("identity_profile", mode="before")
     @classmethod
@@ -224,6 +244,14 @@ class AgentUpdate(SQLModel):
         ),
         examples=["low", "medium", "high"],
     )
+    preferred_model: str | None = Field(
+        default=None,
+        description=(
+            "Optional preferred model in 'provider/model' format. "
+            "Set to null to revert to gateway default."
+        ),
+        examples=["anthropic/claude-opus-4-6", "openai/gpt-4o"],
+    )
 
     @field_validator("identity_template", "soul_template", mode="before")
     @classmethod
@@ -252,6 +280,16 @@ class AgentUpdate(SQLModel):
             return stripped
         msg = "model_effort_tier must be a string"
         raise ValueError(msg)
+
+    @field_validator("preferred_model", mode="before")
+    @classmethod
+    def normalize_preferred_model(cls, value: object) -> str | None:
+        """Normalize blank preferred_model to null."""
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value.strip() or None
+        return None
 
     @field_validator("identity_profile", mode="before")
     @classmethod

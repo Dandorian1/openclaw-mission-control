@@ -48,6 +48,11 @@ export interface AgentRead {
    * Values: 'low', 'medium', 'high', or null (use gateway default).
    */
   model_effort_tier?: string | null;
+  /**
+   * Preferred model in 'provider/model' format.
+   * e.g. 'anthropic/claude-opus-4-6'. Takes precedence over model_effort_tier.
+   */
+  preferred_model?: string | null;
   /** Last update timestamp. */
   updated_at: string;
 }
