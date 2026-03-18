@@ -165,6 +165,8 @@ async def list_gateway_models(
     Calls the ``models.list`` RPC on the gateway connected to the given board.
     Returns an empty list with an error field if the gateway is unreachable.
     """
+    from fastapi import HTTPException as _HTTPException  # noqa: PLC0415
+
     service = GatewaySessionService(session)
     try:
         _board, config, _main = await service.require_gateway(
@@ -181,6 +183,11 @@ async def list_gateway_models(
         else:
             items = []
         return GatewayModelsResponse(models=items)
+    except _HTTPException as exc:
+        # Gracefully handle 404/422 from gateway resolution (no board_id, board
+        # not found, or gateway not configured) — return empty list so the frontend
+        # can fall back to free-text input rather than surfacing an HTTP error.
+        return GatewayModelsResponse(models=[], error=exc.detail if isinstance(exc.detail, str) else str(exc.detail))
     except OpenClawGatewayError as exc:
         return GatewayModelsResponse(models=[], error=str(exc))
 

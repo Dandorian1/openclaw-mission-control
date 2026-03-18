@@ -158,7 +158,8 @@ export default function EditAgentPage() {
       query: {
         enabled: Boolean(isSignedIn && boardIdForModels),
         retry: false,
-        refetchOnMount: false,
+        refetchOnMount: "always",
+        staleTime: 30_000,
       },
     },
   );
@@ -468,9 +469,20 @@ export default function EditAgentPage() {
                 />
               )}
               <p className="text-xs text-muted">
-                {gatewayModelOptions.length > 0
-                  ? "Select a model from your gateway. Leave as gateway default to use the gateway's configured primary model."
-                  : "Enter a provider/model string (e.g. anthropic/claude-opus-4-6). Leave blank to use the gateway default."}
+                {gatewayModelOptions.length > 0 ? (
+                  "Select a model from your gateway. Leave as gateway default to use the gateway\u2019s configured primary model."
+                ) : gatewayModelsQuery.isLoading ? (
+                  "Loading models from gateway\u2026"
+                ) : (
+                  <>
+                    Enter the model in{" "}
+                    <span className="font-mono">provider/model</span> format.
+                    {" "}Examples:{" "}
+                    <span className="font-mono">anthropic/claude-opus-4-6</span>,{" "}
+                    <span className="font-mono">openai/gpt-4o</span>.{" "}
+                    Leave blank to use the gateway default.
+                  </>
+                )}
               </p>
             </div>
           </div>
