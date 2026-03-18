@@ -155,29 +155,23 @@ export default function EditAgentPage() {
   const boardIdForModels =
     loadedAgent?.board_id ?? boards[0]?.id ?? undefined;
 
-  // Always enable the query so React Query re-evaluates when the query key
-  // changes (i.e. when boardIdForModels transitions from undefined → a real
-  // value). The backend handles a missing board_id gracefully (returns 200 + []).
-  const gatewayModelsQuery = useGatewayModelsApiV1GatewaysModelsGet(
-    boardIdForModels ? { board_id: boardIdForModels } : undefined,
-    {
-      query: {
-        enabled: Boolean(isSignedIn),
-        retry: false,
-        refetchOnMount: "always",
-        staleTime: 30_000,
-      },
-    },
-  );
-
-  // Imperatively refetch once boardIdForModels resolves to a real value,
-  // in case the initial query fired before it was available.
-  useEffect(() => {
-    if (boardIdForModels && isSignedIn) {
-      void gatewayModelsQuery.refetch();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardIdForModels, isSignedIn]);
+  // Use useQuery directly instead of the generated hook to avoid the stale
+  // queryFn closure bug: the generated hook captures `params` at call time,
+  // so when boardIdForModels transitions from undefined → a real value the
+  // re-fetch still calls with params=undefined. By moving the fetch call
+  // into the queryFn body with boardIdForModels in the queryKey, React Query
+  // will correctly re-fetch with the updated value.
+  const gatewayModelsQuery = useQuery({
+    queryKey: ["/api/v1/gateways/models", boardIdForModels] as const,
+    queryFn: () =>
+      gatewayModelsApiV1GatewaysModelsGet(
+        boardIdForModels ? { board_id: boardIdForModels } : undefined,
+      ),
+    enabled: Boolean(isSignedIn),
+    retry: false,
+    refetchOnMount: "always",
+    staleTime: 30_000,
+  });
 
   const gatewayModelOptions = useMemo(() => {
     const raw =
