@@ -941,6 +941,22 @@ async def create_task(
         agent_id=agent_ctx.agent.id,
         board_id=task.board_id,
     )
+    # Audit cross-board writes: log when a lead agent creates a task on a
+    # board other than their own. This provides traceability without restricting
+    # the intentional same-gateway cross-board capability (commit 9b2febe).
+    if agent_ctx.agent.board_id and agent_ctx.agent.board_id != task.board_id:
+        record_activity(
+            session,
+            event_type="task.cross_board_write",
+            task_id=task.id,
+            message=(
+                f"Cross-board task created by lead agent {agent_ctx.agent.id} "
+                f"(source board: {agent_ctx.agent.board_id}, "
+                f"target board: {task.board_id}): {task.title}."
+            ),
+            agent_id=agent_ctx.agent.id,
+            board_id=task.board_id,
+        )
     await session.commit()
     if task.assigned_agent_id:
         assigned_agent = await Agent.objects.by_id(task.assigned_agent_id).first(
