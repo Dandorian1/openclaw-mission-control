@@ -183,12 +183,20 @@ export default function EditAgentPage() {
         if (typeof m === "string") return { value: m, label: m };
         if (m && typeof m === "object") {
           const obj = m as Record<string, unknown>;
-          const id =
+          const slug =
             typeof obj.id === "string"
               ? obj.id
               : typeof obj.model === "string"
                 ? obj.model
                 : null;
+          const provider =
+            typeof obj.provider === "string" ? obj.provider : null;
+          // Build the canonical provider/model value the backend expects.
+          // If the slug already contains a slash it is already qualified.
+          const id =
+            slug && provider && !slug.includes("/")
+              ? `${provider}/${slug}`
+              : slug;
           const label =
             typeof obj.name === "string"
               ? obj.name
