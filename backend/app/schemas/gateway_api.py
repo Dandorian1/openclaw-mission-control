@@ -69,3 +69,18 @@ class GatewayModelsResponse(SQLModel):
 
     models: list[object]
     error: str | None = None
+
+
+class GatewayModelConfig(SQLModel):
+    """Resolved model configuration from the gateway."""
+
+    primary: str | None = None
+    fallbacks: list[str] = []
+    error: str | None = None
+
+
+class GatewayModelConfigUpdate(SQLModel):
+    """Payload for updating the gateway default model configuration."""
+
+    primary: str | None = None
+    fallbacks: list[str] | None = None

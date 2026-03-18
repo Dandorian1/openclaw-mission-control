@@ -8,10 +8,14 @@ from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import require_org_admin
 from app.core.auth import AuthContext, get_auth_context
+from app.db import crud
 from app.db.session import get_session
+from app.models.gateways import Gateway
 from app.schemas.common import OkResponse
 from app.schemas.gateway_api import (
     GatewayCommandsResponse,
+    GatewayModelConfig,
+    GatewayModelConfigUpdate,
     GatewayModelsResponse,
     GatewayResolveQuery,
     GatewaySessionHistoryResponse,
@@ -20,6 +24,7 @@ from app.schemas.gateway_api import (
     GatewaySessionsResponse,
     GatewaysStatusResponse,
 )
+from app.services.openclaw.gateway_resolver import gateway_client_config
 from app.services.openclaw.gateway_rpc import (
     GATEWAY_EVENTS,
     GATEWAY_METHODS,
@@ -178,6 +183,116 @@ async def list_gateway_models(
         return GatewayModelsResponse(models=items)
     except OpenClawGatewayError as exc:
         return GatewayModelsResponse(models=[], error=str(exc))
+
+
+@router.get("/{gateway_id}/config/models", response_model=GatewayModelConfig)
+async def get_gateway_model_config(
+    gateway_id: str,
+    session: AsyncSession = SESSION_DEP,
+    _auth: AuthContext = AUTH_DEP,
+    _ctx: OrganizationContext = ORG_ADMIN_DEP,
+) -> GatewayModelConfig:
+    """Read the current default model configuration from the gateway.
+
+    Returns the primary model and fallback list from
+    ``agents.defaults.model`` in the gateway config.
+    """
+    from sqlmodel import select, col
+    gateway = (
+        await session.exec(select(Gateway).where(col(Gateway.id) == gateway_id))
+    ).first()
+    if gateway is None:
+        from fastapi import HTTPException as _HTTPException
+        raise _HTTPException(status_code=404)
+    try:
+        config = gateway_client_config(gateway)
+        raw = await openclaw_call("config.get", config=config)
+        if not isinstance(raw, dict):
+            return GatewayModelConfig()
+        data = raw.get("config") or raw.get("parsed") or {}
+        if not isinstance(data, dict):
+            return GatewayModelConfig()
+        agents_section = data.get("agents") or {}
+        defaults = agents_section.get("defaults") or {}
+        model_section = defaults.get("model") or {}
+        if isinstance(model_section, str):
+            return GatewayModelConfig(primary=model_section)
+        if isinstance(model_section, dict):
+            primary = model_section.get("primary")
+            fallbacks_raw = model_section.get("fallbacks") or []
+            fallbacks = [str(f) for f in fallbacks_raw if f]
+            return GatewayModelConfig(
+                primary=str(primary) if primary else None,
+                fallbacks=fallbacks,
+            )
+        return GatewayModelConfig()
+    except OpenClawGatewayError as exc:
+        return GatewayModelConfig(error=str(exc))
+
+
+@router.patch("/{gateway_id}/config/models", response_model=GatewayModelConfig)
+async def update_gateway_model_config(
+    gateway_id: str,
+    payload: GatewayModelConfigUpdate,
+    session: AsyncSession = SESSION_DEP,
+    _auth: AuthContext = AUTH_DEP,
+    _ctx: OrganizationContext = ORG_ADMIN_DEP,
+) -> GatewayModelConfig:
+    """Update the default model configuration on the gateway.
+
+    Applies a ``config.patch`` setting ``agents.defaults.model.primary``
+    and/or ``agents.defaults.model.fallbacks``.
+    """
+    import json
+    from sqlmodel import select, col
+    gateway = (
+        await session.exec(select(Gateway).where(col(Gateway.id) == gateway_id))
+    ).first()
+    if gateway is None:
+        from fastapi import HTTPException as _HTTPException
+        raise _HTTPException(status_code=404)
+    try:
+        config = gateway_client_config(gateway)
+        # Build patch dict — only include fields that were provided
+        model_patch: dict = {}
+        if payload.primary is not None:
+            model_patch["primary"] = payload.primary
+        if payload.fallbacks is not None:
+            model_patch["fallbacks"] = payload.fallbacks
+
+        if not model_patch:
+            # Nothing to update — re-read and return current
+            return await _read_gateway_model_config(config)
+
+        patch = {"agents": {"defaults": {"model": model_patch}}}
+        await openclaw_call("config.patch", {"raw": json.dumps(patch)}, config=config)
+        return await _read_gateway_model_config(config)
+    except OpenClawGatewayError as exc:
+        return GatewayModelConfig(error=str(exc))
+
+
+async def _read_gateway_model_config(config) -> GatewayModelConfig:
+    """Helper: read and parse agents.defaults.model from gateway config."""
+    raw = await openclaw_call("config.get", config=config)
+    if not isinstance(raw, dict):
+        return GatewayModelConfig()
+    data = raw.get("config") or raw.get("parsed") or {}
+    if not isinstance(data, dict):
+        return GatewayModelConfig()
+    agents_section = data.get("agents") or {}
+    defaults = agents_section.get("defaults") or {}
+    model_section = defaults.get("model") or {}
+    if isinstance(model_section, str):
+        return GatewayModelConfig(primary=model_section)
+    if isinstance(model_section, dict):
+        primary = model_section.get("primary")
+        fallbacks_raw = model_section.get("fallbacks") or []
+        fallbacks = [str(f) for f in fallbacks_raw if f]
+        return GatewayModelConfig(
+            primary=str(primary) if primary else None,
+            fallbacks=fallbacks,
+        )
+    return GatewayModelConfig()
 
 
 @router.get("/commands", response_model=GatewayCommandsResponse)

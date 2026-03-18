@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useMemo, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 
 import { useAuth } from "@/auth/clerk";
@@ -11,6 +12,7 @@ import { AgentsTable } from "@/components/agents/AgentsTable";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { Button } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { Input } from "@/components/ui/input";
 
 import { ApiError } from "@/api/mutator";
 import {
@@ -22,6 +24,7 @@ import {
   type getGatewayApiV1GatewaysGatewayIdGetResponse,
   useGatewaysStatusApiV1GatewaysStatusGet,
   useGetGatewayApiV1GatewaysGatewayIdGet,
+  useGatewayModelsApiV1GatewaysModelsGet,
 } from "@/api/generated/gateways/gateways";
 import {
   type listAgentsApiV1AgentsGetResponse,
@@ -52,6 +55,15 @@ export default function GatewayDetailPage() {
 
   const { isAdmin } = useOrganizationMembership(isSignedIn);
   const [deleteTarget, setDeleteTarget] = useState<AgentRead | null>(null);
+
+  // Model configuration state
+  const [primaryModel, setPrimaryModel] = useState<string>("");
+  const [fallbackInput, setFallbackInput] = useState<string>("");
+  const [fallbacks, setFallbacks] = useState<string[]>([]);
+  const [modelConfigLoaded, setModelConfigLoaded] = useState(false);
+  const [modelSaving, setModelSaving] = useState(false);
+  const [modelSaveError, setModelSaveError] = useState<string | null>(null);
+  const [modelSaveSuccess, setModelSaveSuccess] = useState(false);
   const agentsKey = getListAgentsApiV1AgentsGetQueryKey(
     gatewayId ? { gateway_id: gatewayId } : undefined,
   );
@@ -148,6 +160,79 @@ export default function GatewayDetailPage() {
   const status =
     statusQuery.data?.status === 200 ? statusQuery.data.data : null;
   const isConnected = status?.connected ?? false;
+
+  // Available models from gateway (for the fallback dropdown)
+  const gatewayModelsQuery = useGatewayModelsApiV1GatewaysModelsGet(
+    undefined,
+    { query: { enabled: Boolean(isSignedIn && isAdmin && gateway && isConnected), retry: false } },
+  );
+  const availableModels = useMemo(() => {
+    const raw = gatewayModelsQuery.data?.status === 200
+      ? (gatewayModelsQuery.data.data?.models ?? [])
+      : [];
+    return raw
+      .map((m) => {
+        if (typeof m === "string") return m;
+        if (m && typeof m === "object") {
+          const obj = m as Record<string, unknown>;
+          return typeof obj.id === "string" ? obj.id
+            : typeof obj.model === "string" ? obj.model : null;
+        }
+        return null;
+      })
+      .filter((s): s is string => !!s);
+  }, [gatewayModelsQuery.data]);
+
+  // Fetch current model config from gateway when connected
+  const modelConfigFetcher = async () => {
+    if (!gatewayId || !isConnected || modelConfigLoaded) return;
+    try {
+      const res = await fetch(`/api/v1/gateways/${gatewayId}/config/models`);
+      if (res.ok) {
+        const data: { primary?: string | null; fallbacks?: string[] } = await res.json();
+        setPrimaryModel(data.primary ?? "");
+        setFallbacks(data.fallbacks ?? []);
+        setModelConfigLoaded(true);
+      }
+    } catch {
+      // silent — gateway may not be reachable
+    }
+  };
+
+  // Load model config once connected
+  if (isConnected && !modelConfigLoaded && gatewayId) {
+    void modelConfigFetcher();
+  }
+
+  const handleSaveModelConfig = async () => {
+    if (!gatewayId) return;
+    setModelSaving(true);
+    setModelSaveError(null);
+    setModelSaveSuccess(false);
+    try {
+      const res = await fetch(`/api/v1/gateways/${gatewayId}/config/models`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          primary: primaryModel.trim() || null,
+          fallbacks: fallbacks.filter(Boolean),
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setModelSaveError(data.error);
+      } else {
+        setPrimaryModel(data.primary ?? "");
+        setFallbacks(data.fallbacks ?? []);
+        setModelSaveSuccess(true);
+        setTimeout(() => setModelSaveSuccess(false), 3000);
+      }
+    } catch (err) {
+      setModelSaveError("Failed to save model configuration.");
+    } finally {
+      setModelSaving(false);
+    }
+  };
 
   const title = useMemo(
     () => (gateway?.name ? gateway.name : "Gateway"),
@@ -278,6 +363,121 @@ export default function GatewayDetailPage() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Model Configuration section */}
+            <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                  Model Configuration
+                </p>
+                {!isConnected ? (
+                  <span className="text-xs text-muted">Connect the gateway to configure models</span>
+                ) : null}
+              </div>
+              {isConnected ? (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-strong">Default model</label>
+                    {availableModels.length > 0 ? (
+                      <select
+                        value={primaryModel}
+                        onChange={(e) => setPrimaryModel(e.target.value)}
+                        disabled={modelSaving}
+                        className="flex h-11 w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 text-sm text-strong shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]"
+                      >
+                        <option value="">Gateway default</option>
+                        {availableModels.map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <Input
+                        value={primaryModel}
+                        onChange={(e) => setPrimaryModel(e.target.value)}
+                        placeholder="e.g. anthropic/claude-opus-4-6"
+                        disabled={modelSaving}
+                        className="font-mono text-sm"
+                      />
+                    )}
+                    <p className="text-xs text-muted">
+                      The primary model used by all agents on this gateway unless overridden per-agent.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-strong">Fallback models</label>
+                    <div className="space-y-2">
+                      {fallbacks.map((fb, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <span className="flex-1 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 text-sm font-mono text-strong">
+                            {fb}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setFallbacks((prev) => prev.filter((_, idx) => idx !== i))}
+                            disabled={modelSaving}
+                            className="text-muted hover:text-[color:var(--danger)] transition"
+                            aria-label={`Remove fallback ${fb}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={fallbackInput}
+                          onChange={(e) => setFallbackInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              const val = fallbackInput.trim();
+                              if (val) { setFallbacks((prev) => [...prev, val]); setFallbackInput(""); }
+                            }
+                          }}
+                          placeholder="Add fallback model (e.g. openai/gpt-4o)"
+                          disabled={modelSaving}
+                          className="font-mono text-sm flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={modelSaving || !fallbackInput.trim()}
+                          onClick={() => {
+                            const val = fallbackInput.trim();
+                            if (val) { setFallbacks((prev) => [...prev, val]); setFallbackInput(""); }
+                          }}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted">
+                      Used in order when the primary model is unavailable.
+                    </p>
+                  </div>
+
+                  {modelSaveError ? (
+                    <div className="rounded-lg border border-danger bg-danger-soft px-3 py-2 text-sm text-danger">
+                      {modelSaveError}
+                    </div>
+                  ) : null}
+                  {modelSaveSuccess ? (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">
+                      Model configuration saved.
+                    </div>
+                  ) : null}
+
+                  <Button onClick={handleSaveModelConfig} disabled={modelSaving}>
+                    {modelSaving ? "Saving…" : "Save model config"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-3 text-sm text-muted">
+                  Gateway is offline. Connect the gateway to view and edit model configuration.
+                </div>
+              )}
             </div>
 
             <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-sm">
