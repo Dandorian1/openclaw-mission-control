@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
@@ -12,6 +13,22 @@ from sqlmodel import SQLModel
 from sqlmodel._compat import SQLModelConfig
 
 from app.schemas.common import NonEmptyStr
+
+# Validation for preferred_model — must be "provider/model" format.
+#
+# Rules:
+# - Provider segment must start with an alphanumeric character and must not
+#   end with a literal dot (no trailing dot before the slash).
+# - Model segment must start with an alphanumeric character.
+# - Each segment may contain alphanumerics, hyphens, underscores, and dots.
+# - The model segment may contain forward slashes (OpenRouter-style IDs).
+# - No ".." sequences anywhere (blocks path traversal attempts).
+# - Max length 200 chars prevents DB abuse and oversized gateway payloads.
+_PREFERRED_MODEL_RE = re.compile(
+    r"^[a-zA-Z0-9][a-zA-Z0-9_\-\.]*(?<!\.)/"  # provider: starts alnum, no trailing dot
+    r"[a-zA-Z0-9][a-zA-Z0-9_\-\./]*$",  # model: starts alnum, slashes allowed
+)
+_PREFERRED_MODEL_MAX_LEN = 200
 
 _RUNTIME_TYPE_REFERENCES = (datetime, UUID, NonEmptyStr)
 
@@ -152,12 +169,34 @@ class AgentBase(SQLModel):
     @field_validator("preferred_model", mode="before")
     @classmethod
     def normalize_preferred_model(cls, value: object) -> str | None:
-        """Normalize blank preferred_model to null."""
+        """Normalize and validate preferred_model.
+
+        - Blank/whitespace -> None (cleared)
+        - Non-string -> None (ignored)
+        - Exceeds max length -> ValueError
+        - Does not match provider/model format -> ValueError
+        - Valid -> lowercased and stripped
+        """
         if value is None:
             return None
-        if isinstance(value, str):
-            return value.strip() or None
-        return None
+        if not isinstance(value, str):
+            return None
+        stripped = value.strip()
+        if not stripped:
+            return None
+        if len(stripped) >= _PREFERRED_MODEL_MAX_LEN:
+            msg = (
+                f"preferred_model must not exceed {_PREFERRED_MODEL_MAX_LEN} characters"
+            )
+            raise ValueError(msg)
+        if ".." in stripped or not _PREFERRED_MODEL_RE.match(stripped):
+            msg = (
+                "preferred_model must be in 'provider/model' format "
+                "(e.g. 'anthropic/claude-opus-4-6'). "
+                "Path traversal sequences are not allowed."
+            )
+            raise ValueError(msg)
+        return stripped.lower()
 
     @field_validator("identity_profile", mode="before")
     @classmethod
@@ -284,12 +323,34 @@ class AgentUpdate(SQLModel):
     @field_validator("preferred_model", mode="before")
     @classmethod
     def normalize_preferred_model(cls, value: object) -> str | None:
-        """Normalize blank preferred_model to null."""
+        """Normalize and validate preferred_model.
+
+        - Blank/whitespace -> None (cleared)
+        - Non-string -> None (ignored)
+        - Exceeds max length -> ValueError
+        - Does not match provider/model format -> ValueError
+        - Valid -> lowercased and stripped
+        """
         if value is None:
             return None
-        if isinstance(value, str):
-            return value.strip() or None
-        return None
+        if not isinstance(value, str):
+            return None
+        stripped = value.strip()
+        if not stripped:
+            return None
+        if len(stripped) >= _PREFERRED_MODEL_MAX_LEN:
+            msg = (
+                f"preferred_model must not exceed {_PREFERRED_MODEL_MAX_LEN} characters"
+            )
+            raise ValueError(msg)
+        if ".." in stripped or not _PREFERRED_MODEL_RE.match(stripped):
+            msg = (
+                "preferred_model must be in 'provider/model' format "
+                "(e.g. 'anthropic/claude-opus-4-6'). "
+                "Path traversal sequences are not allowed."
+            )
+            raise ValueError(msg)
+        return stripped.lower()
 
     @field_validator("identity_profile", mode="before")
     @classmethod
