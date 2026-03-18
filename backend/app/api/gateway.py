@@ -12,6 +12,7 @@ from app.db.session import get_session
 from app.schemas.common import OkResponse
 from app.schemas.gateway_api import (
     GatewayCommandsResponse,
+    GatewayModelsResponse,
     GatewayResolveQuery,
     GatewaySessionHistoryResponse,
     GatewaySessionMessageRequest,
@@ -19,7 +20,13 @@ from app.schemas.gateway_api import (
     GatewaySessionsResponse,
     GatewaysStatusResponse,
 )
-from app.services.openclaw.gateway_rpc import GATEWAY_EVENTS, GATEWAY_METHODS, PROTOCOL_VERSION
+from app.services.openclaw.gateway_rpc import (
+    GATEWAY_EVENTS,
+    GATEWAY_METHODS,
+    PROTOCOL_VERSION,
+    OpenClawGatewayError,
+    openclaw_call,
+)
 from app.services.openclaw.session_service import GatewaySessionService
 from app.services.organizations import OrganizationContext
 
@@ -139,6 +146,38 @@ async def send_gateway_session_message(
         user=auth.user,
     )
     return OkResponse()
+
+
+@router.get("/models", response_model=GatewayModelsResponse)
+async def list_gateway_models(
+    board_id: str | None = BOARD_ID_QUERY,
+    session: AsyncSession = SESSION_DEP,
+    auth: AuthContext = AUTH_DEP,
+    ctx: OrganizationContext = ORG_ADMIN_DEP,
+) -> GatewayModelsResponse:
+    """Return the list of models available on the gateway.
+
+    Calls the ``models.list`` RPC on the gateway connected to the given board.
+    Returns an empty list with an error field if the gateway is unreachable.
+    """
+    service = GatewaySessionService(session)
+    try:
+        _board, config, _main = await service.require_gateway(
+            board_id,
+            user=auth.user,
+        )
+        raw = await openclaw_call("models.list", config=config)
+        if isinstance(raw, dict):
+            items: list[object] = raw.get("models") or raw.get("items") or []
+            if not isinstance(items, list):
+                items = list(raw.values())
+        elif isinstance(raw, list):
+            items = raw
+        else:
+            items = []
+        return GatewayModelsResponse(models=items)
+    except OpenClawGatewayError as exc:
+        return GatewayModelsResponse(models=[], error=str(exc))
 
 
 @router.get("/commands", response_model=GatewayCommandsResponse)

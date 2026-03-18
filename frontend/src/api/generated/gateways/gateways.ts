@@ -2432,3 +2432,71 @@ export const useSyncGatewayTemplatesApiV1GatewaysGatewayIdTemplatesSyncPost = <
     queryClient,
   );
 };
+
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Gateway models list — GET /api/v1/gateways/models
+// ---------------------------------------------------------------------------
+
+export type gatewayModelsApiV1GatewaysModelsGetResponse200 = {
+  status: 200;
+  data: { models: object[]; error?: string | null };
+};
+
+export type gatewayModelsApiV1GatewaysModelsGetResponse =
+  gatewayModelsApiV1GatewaysModelsGetResponse200;
+
+export const getGatewayModelsApiV1GatewaysModelsGetUrl = (
+  params?: { board_id?: string | null },
+) => {
+  const normalizedParams = new URLSearchParams();
+  if (params?.board_id) normalizedParams.append("board_id", params.board_id);
+  const s = normalizedParams.toString();
+  return s.length > 0 ? `/api/v1/gateways/models?${s}` : `/api/v1/gateways/models`;
+};
+
+export const gatewayModelsApiV1GatewaysModelsGet = async (
+  params?: { board_id?: string | null },
+  options?: RequestInit,
+): Promise<gatewayModelsApiV1GatewaysModelsGetResponse> => {
+  return customFetch<gatewayModelsApiV1GatewaysModelsGetResponse>(
+    getGatewayModelsApiV1GatewaysModelsGetUrl(params),
+    { ...options, method: "GET" },
+  );
+};
+
+export const getGatewayModelsApiV1GatewaysModelsGetQueryKey = (
+  params?: { board_id?: string | null },
+) => {
+  return [`/api/v1/gateways/models`, ...(params ? [params] : [])] as const;
+};
+
+export function useGatewayModelsApiV1GatewaysModelsGet<
+  TData = Awaited<ReturnType<typeof gatewayModelsApiV1GatewaysModelsGet>>,
+  TError = unknown,
+>(
+  params?: { board_id?: string | null },
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof gatewayModelsApiV1GatewaysModelsGet>>,
+        TError,
+        TData
+      >
+    >;
+  },
+) {
+  const { query: queryOptions } = options ?? {};
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGatewayModelsApiV1GatewaysModelsGetQueryKey(params);
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof gatewayModelsApiV1GatewaysModelsGet>>
+  > = () => gatewayModelsApiV1GatewaysModelsGet(params);
+  return useQuery<
+    Awaited<ReturnType<typeof gatewayModelsApiV1GatewaysModelsGet>>,
+    TError,
+    TData
+  >({ queryKey, queryFn, ...queryOptions });
+}

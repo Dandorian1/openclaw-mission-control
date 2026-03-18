@@ -17,6 +17,7 @@ import {
   type listBoardsApiV1BoardsGetResponse,
   useListBoardsApiV1BoardsGet,
 } from "@/api/generated/boards/boards";
+import { useGatewayModelsApiV1GatewaysModelsGet } from "@/api/generated/gateways/gateways";
 import type { AgentRead, AgentUpdate, BoardRead } from "@/api/generated/model";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { Button } from "@/components/ui/button";
@@ -146,6 +147,50 @@ export default function EditAgentPage() {
   }, [boardsQuery.data]);
   const loadedAgent: AgentRead | null =
     agentQuery.data?.status === 200 ? agentQuery.data.data : null;
+
+  // Resolve the board_id to use for fetching gateway models
+  const boardIdForModels =
+    loadedAgent?.board_id ?? boards[0]?.id ?? undefined;
+
+  const gatewayModelsQuery = useGatewayModelsApiV1GatewaysModelsGet(
+    boardIdForModels ? { board_id: boardIdForModels } : undefined,
+    {
+      query: {
+        enabled: Boolean(isSignedIn && boardIdForModels),
+        retry: false,
+        refetchOnMount: false,
+      },
+    },
+  );
+
+  const gatewayModelOptions = useMemo(() => {
+    const raw =
+      gatewayModelsQuery.data?.status === 200
+        ? (gatewayModelsQuery.data?.data?.models ?? [])
+        : [];
+    return raw
+      .map((m) => {
+        if (typeof m === "string") return { value: m, label: m };
+        if (m && typeof m === "object") {
+          const obj = m as Record<string, unknown>;
+          const id =
+            typeof obj.id === "string"
+              ? obj.id
+              : typeof obj.model === "string"
+                ? obj.model
+                : null;
+          const label =
+            typeof obj.name === "string"
+              ? obj.name
+              : typeof obj.alias === "string"
+                ? obj.alias
+                : id;
+          if (id) return { value: id, label: label ?? id };
+        }
+        return null;
+      })
+      .filter(Boolean) as { value: string; label: string }[];
+  }, [gatewayModelsQuery.data]);
 
   const loadedHeartbeat = useMemo(() => {
     const heartbeat = loadedAgent?.heartbeat_config;
@@ -392,46 +437,40 @@ export default function EditAgentPage() {
           <div className="mt-4 grid gap-6 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-medium text-strong">
-                Model effort
+                Model
               </label>
-              <Select
-                value={resolvedModelEffortTier || "default"}
-                onValueChange={(value) =>
-                  setModelEffortTier(value === "default" ? "" : value)
-                }
-                disabled={isLoading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Gateway default" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Gateway default</SelectItem>
-                  <SelectItem value="low">Low — fast, lightweight</SelectItem>
-                  <SelectItem value="medium">Medium — balanced</SelectItem>
-                  <SelectItem value="high">High — most capable</SelectItem>
-                </SelectContent>
-              </Select>
+              {gatewayModelOptions.length > 0 ? (
+                <SearchableSelect
+                  ariaLabel="Select model"
+                  value={resolvedPreferredModel || "__default__"}
+                  onValueChange={(value) =>
+                    setPreferredModel(value === "__default__" ? "" : value)
+                  }
+                  options={[
+                    { value: "__default__", label: "Gateway default" },
+                    ...gatewayModelOptions,
+                  ]}
+                  placeholder="Gateway default"
+                  searchPlaceholder="Search models..."
+                  emptyMessage="No matching models."
+                  disabled={isLoading}
+                  triggerClassName="w-full h-11 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm font-medium text-strong shadow-sm"
+                  contentClassName="rounded-xl border border-[color:var(--border)] shadow-lg"
+                  itemClassName="px-4 py-3 text-sm text-strong font-mono data-[selected=true]:bg-[color:var(--surface-muted)]"
+                />
+              ) : (
+                <Input
+                  value={resolvedPreferredModel}
+                  onChange={(event) => setPreferredModel(event.target.value)}
+                  placeholder="e.g. anthropic/claude-opus-4-6"
+                  disabled={isLoading}
+                  className="font-mono text-sm"
+                />
+              )}
               <p className="text-xs text-muted">
-                Controls which model tier this agent uses. Leave as gateway
-                default unless this agent has specific performance needs.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-strong">
-                Specific model
-              </label>
-              <Input
-                value={resolvedPreferredModel}
-                onChange={(event) => setPreferredModel(event.target.value)}
-                placeholder="e.g. anthropic/claude-opus-4-6"
-                disabled={isLoading}
-                className="font-mono text-sm"
-              />
-              <p className="text-xs text-muted">
-                Optional. Enter a{" "}
-                <span className="font-mono">provider/model</span> string to pin
-                this agent to a specific model. Overrides model effort tier when
-                set. Leave blank to use the gateway default.
+                {gatewayModelOptions.length > 0
+                  ? "Select a model from your gateway. Leave as gateway default to use the gateway's configured primary model."
+                  : "Enter a provider/model string (e.g. anthropic/claude-opus-4-6). Leave blank to use the gateway default."}
               </p>
             </div>
           </div>

@@ -62,3 +62,10 @@ class GatewayCommandsResponse(SQLModel):
     protocol_version: int
     methods: list[str]
     events: list[str]
+
+
+class GatewayModelsResponse(SQLModel):
+    """Available models list from the gateway."""
+
+    models: list[object]
+    error: str | None = None
