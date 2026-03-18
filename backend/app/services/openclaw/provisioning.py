@@ -1211,7 +1211,12 @@ class OpenClawGatewayProvisioner:
             allow_insecure_tls=gateway.allow_insecure_tls,
             disable_device_pairing=gateway.disable_device_pairing,
         )
-        await ensure_session(session_key, config=client_config, label=agent.name)
+        await ensure_session(
+            session_key,
+            config=client_config,
+            label=agent.name,
+            model=agent.preferred_model or None,
+        )
         verb = wakeup_verb or ("provisioned" if action == "provision" else "updated")
         await send_message(
             _wakeup_text(agent, verb=verb),
