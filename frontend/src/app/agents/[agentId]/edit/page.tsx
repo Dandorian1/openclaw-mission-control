@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { useAuth } from "@/auth/clerk";
@@ -17,7 +17,8 @@ import {
   type listBoardsApiV1BoardsGetResponse,
   useListBoardsApiV1BoardsGet,
 } from "@/api/generated/boards/boards";
-import { useGatewayModelsApiV1GatewaysModelsGet } from "@/api/generated/gateways/gateways";
+import { gatewayModelsApiV1GatewaysModelsGet } from "@/api/generated/gateways/gateways";
+import { useQuery } from "@tanstack/react-query";
 import type { AgentRead, AgentUpdate, BoardRead } from "@/api/generated/model";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { Button } from "@/components/ui/button";
@@ -148,21 +149,35 @@ export default function EditAgentPage() {
   const loadedAgent: AgentRead | null =
     agentQuery.data?.status === 200 ? agentQuery.data.data : null;
 
-  // Resolve the board_id to use for fetching gateway models
+  // Resolve the board_id to use for fetching gateway models.
+  // loadedAgent?.board_id is the most accurate value but may arrive async;
+  // boards[0]?.id is an early fallback so the query can start sooner.
   const boardIdForModels =
     loadedAgent?.board_id ?? boards[0]?.id ?? undefined;
 
+  // Always enable the query so React Query re-evaluates when the query key
+  // changes (i.e. when boardIdForModels transitions from undefined → a real
+  // value). The backend handles a missing board_id gracefully (returns 200 + []).
   const gatewayModelsQuery = useGatewayModelsApiV1GatewaysModelsGet(
     boardIdForModels ? { board_id: boardIdForModels } : undefined,
     {
       query: {
-        enabled: Boolean(isSignedIn && boardIdForModels),
+        enabled: Boolean(isSignedIn),
         retry: false,
         refetchOnMount: "always",
         staleTime: 30_000,
       },
     },
   );
+
+  // Imperatively refetch once boardIdForModels resolves to a real value,
+  // in case the initial query fired before it was available.
+  useEffect(() => {
+    if (boardIdForModels && isSignedIn) {
+      void gatewayModelsQuery.refetch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boardIdForModels, isSignedIn]);
 
   const gatewayModelOptions = useMemo(() => {
     const raw =
