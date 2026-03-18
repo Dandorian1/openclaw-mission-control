@@ -22,6 +22,7 @@ from app.db.pagination import paginate
 from app.db.session import get_session
 from app.models.agents import Agent
 from app.models.board_webhook_payloads import BoardWebhookPayload
+from app.models.board_memory import BoardMemory
 from app.models.boards import Board
 from app.models.gateways import Gateway
 from app.models.tags import Tag
@@ -257,6 +258,49 @@ def _guard_task_access(agent_ctx: AgentAuthContext, task: Task) -> None:
         agent_ctx.agent.board_id and task.board_id and agent_ctx.agent.board_id != task.board_id
     )
     OpenClawAuthorizationPolicy.require_board_write_access(allowed=allowed)
+
+
+async def _require_board_not_paused(
+    board_id: object,
+    session: object,
+) -> None:
+    """Raise HTTP 423 Locked if the board is currently paused.
+
+    Pause state is determined by the most recent /pause or /resume chat
+    message on the board. If the latest is /pause, the board is paused and
+    agent write operations are blocked until a /resume is posted.
+    """
+    from sqlmodel.ext.asyncio.session import AsyncSession as _AsyncSession
+
+    if not isinstance(session, _AsyncSession):  # type: ignore[misc]
+        return
+
+    from uuid import UUID as _UUID
+    board_uuid = board_id if isinstance(board_id, _UUID) else None
+    if board_uuid is None:
+        try:
+            board_uuid = _UUID(str(board_id))
+        except (ValueError, AttributeError):
+            return
+
+    commands = {"/pause", "/resume"}
+    statement = (
+        select(BoardMemory.content)
+        .where(col(BoardMemory.board_id) == board_uuid)
+        .where(col(BoardMemory.is_chat).is_(True))
+        .where(func.lower(func.trim(col(BoardMemory.content))).in_(commands))
+        .order_by(col(BoardMemory.created_at).desc())
+        .limit(1)
+    )
+    result = (await session.exec(statement)).first()  # type: ignore[union-attr]
+    if result and (result or "").strip().lower() == "/pause":
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail=(
+                "This board is paused. Agent write operations are suspended "
+                "until the board is resumed."
+            ),
+        )
 
 
 @router.get(
@@ -810,6 +854,7 @@ async def create_task(
     Lead-only endpoint. Supports dependency-aware creation via
     `depends_on_task_ids`, optional `tag_ids`, and `custom_field_values`.
     """
+    await _require_board_not_paused(board.id, session)
     _guard_lead_cross_board_access(agent_ctx, board)
     _require_board_lead(agent_ctx)
     data = payload.model_dump(
@@ -953,6 +998,7 @@ async def update_task(
 
     Supports status, assignment, dependencies, and optional inline comment.
     """
+    await _require_board_not_paused(task.board_id, session)
     _guard_task_access(agent_ctx, task)
     return await tasks_api.update_task(
         payload=payload,
@@ -1074,6 +1120,7 @@ async def create_task_comment(
 
     This is the primary collaboration/log surface for task progress.
     """
+    await _require_board_not_paused(task.board_id, session)
     _guard_task_access(agent_ctx, task)
     return await tasks_api.create_task_comment(
         payload=payload,
@@ -1156,6 +1203,17 @@ async def create_board_memory(
 
     Use tags to indicate purpose (e.g. `chat`, `decision`, `plan`, `handoff`).
     """
+    # Allow /pause and /resume chat messages through even when paused —
+    # these are control commands, not agent work output.
+    is_control_command = (
+        getattr(payload, "tags", None)
+        and isinstance(payload.tags, list)
+        and "chat" in payload.tags
+        and isinstance(getattr(payload, "content", None), str)
+        and payload.content.strip().lower() in {"/pause", "/resume"}  # type: ignore[union-attr]
+    )
+    if not is_control_command:
+        await _require_board_not_paused(board.id, session)
     _guard_board_access(agent_ctx, board)
     return await board_memory_api.create_board_memory(
         payload=payload,
@@ -1236,6 +1294,7 @@ async def create_approval(
 
     Include `task_id` or `task_ids` to scope the decision precisely.
     """
+    await _require_board_not_paused(board.id, session)
     _guard_board_access(agent_ctx, board)
     return await approvals_api.create_approval(
         payload=payload,
