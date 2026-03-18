@@ -13,6 +13,7 @@ from sqlmodel import col, select
 
 from app.api.deps import get_board_for_user_read, get_board_for_user_write, get_board_or_404
 from app.core.client_ip import get_client_ip
+from app.core.webhook_secrets import decrypt_secret, encrypt_secret
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.rate_limit import webhook_ingest_limiter
@@ -197,8 +198,10 @@ def _verify_webhook_signature(
     if sig_value.lower().startswith("sha256="):
         sig_value = sig_value[7:]
     sig_value = sig_value.strip().lower()
+    # Decrypt the stored secret (no-op for legacy plaintext values)
+    raw_secret = decrypt_secret(webhook.secret)
     expected = hmac.new(
-        webhook.secret.encode("utf-8"),
+        raw_secret.encode("utf-8"),
         raw_body,
         hashlib.sha256,
     ).hexdigest()
@@ -375,7 +378,7 @@ async def create_board_webhook(
         agent_id=payload.agent_id,
         description=payload.description,
         enabled=payload.enabled,
-        secret=payload.secret,
+        secret=encrypt_secret(payload.secret) if payload.secret else payload.secret,
         signature_header=payload.signature_header,
     )
     await crud.save(session, webhook)
@@ -412,6 +415,9 @@ async def update_board_webhook(
     )
     updates = payload.model_dump(exclude_unset=True)
     if updates:
+        # Encrypt secret before persisting if one is being set
+        if "secret" in updates and updates["secret"]:
+            updates["secret"] = encrypt_secret(updates["secret"])
         await _validate_agent_id(
             session=session,
             board=board,
