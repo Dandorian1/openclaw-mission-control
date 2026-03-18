@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
+from jinja2.sandbox import SandboxedEnvironment
 
 from app.core.config import settings
 from app.core.logging import get_logger
@@ -472,7 +473,16 @@ def _render_agent_files(
             continue
         override = overrides.get(name)
         if override:
-            rendered[name] = env.from_string(override).render(**context).strip()
+            # Use SandboxedEnvironment for user-supplied templates (identity_template /
+            # soul_template) to prevent Server-Side Template Injection (SSTI).
+            # The sandbox disables access to __class__, __globals__, os, and other
+            # dangerous attributes, blocking RCE even if a malicious template is stored.
+            sandbox_env = SandboxedEnvironment(
+                autoescape=select_autoescape(default=False),
+                undefined=StrictUndefined,
+                keep_trailing_newline=True,
+            )
+            rendered[name] = sandbox_env.from_string(override).render(**context).strip()
             continue
         template_name = (
             template_overrides[name] if template_overrides and name in template_overrides else name
