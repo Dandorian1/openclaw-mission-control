@@ -101,6 +101,15 @@ class AgentBase(SQLModel):
         description="Template representing deeper agent instructions.",
         examples=["When critical blockers appear, escalate in plain language."],
     )
+    model_effort_tier: str | None = Field(
+        default=None,
+        description=(
+            "Preferred model effort tier for this agent. "
+            "Controls the model complexity used when this agent runs. "
+            "Accepted values: 'low', 'medium', 'high', or null (use gateway default)."
+        ),
+        examples=["low", "medium", "high"],
+    )
 
     @field_validator("identity_template", "soul_template", mode="before")
     @classmethod
@@ -112,6 +121,23 @@ class AgentBase(SQLModel):
             value = value.strip()
             return value or None
         return value
+
+    @field_validator("model_effort_tier", mode="before")
+    @classmethod
+    def normalize_model_effort_tier(cls, value: object) -> str | None:
+        """Normalize and validate model_effort_tier."""
+        if value is None:
+            return None
+        if isinstance(value, str):
+            stripped = value.strip().lower()
+            if not stripped:
+                return None
+            if stripped not in {"low", "medium", "high"}:
+                msg = "model_effort_tier must be 'low', 'medium', or 'high'"
+                raise ValueError(msg)
+            return stripped
+        msg = "model_effort_tier must be a string"
+        raise ValueError(msg)
 
     @field_validator("identity_profile", mode="before")
     @classmethod
@@ -190,6 +216,14 @@ class AgentUpdate(SQLModel):
         description="Optional replacement soul template.",
         examples=["Escalate only after checking all known mitigations."],
     )
+    model_effort_tier: str | None = Field(
+        default=None,
+        description=(
+            "Optional model effort tier override. "
+            "Accepted values: 'low', 'medium', 'high', or null to clear."
+        ),
+        examples=["low", "medium", "high"],
+    )
 
     @field_validator("identity_template", "soul_template", mode="before")
     @classmethod
@@ -201,6 +235,23 @@ class AgentUpdate(SQLModel):
             value = value.strip()
             return value or None
         return value
+
+    @field_validator("model_effort_tier", mode="before")
+    @classmethod
+    def normalize_model_effort_tier(cls, value: object) -> str | None:
+        """Normalize and validate model_effort_tier."""
+        if value is None:
+            return None
+        if isinstance(value, str):
+            stripped = value.strip().lower()
+            if not stripped:
+                return None
+            if stripped not in {"low", "medium", "high"}:
+                msg = "model_effort_tier must be 'low', 'medium', or 'high'"
+                raise ValueError(msg)
+            return stripped
+        msg = "model_effort_tier must be a string"
+        raise ValueError(msg)
 
     @field_validator("identity_profile", mode="before")
     @classmethod

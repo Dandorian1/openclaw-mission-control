@@ -42,6 +42,12 @@ export interface AgentRead {
   soul_template?: string | null;
   /** Current lifecycle state used by coordinator logic. */
   status?: string;
+  /**
+   * Preferred model effort tier for this agent.
+   * Controls the model complexity used when this agent runs.
+   * Values: 'low', 'medium', 'high', or null (use gateway default).
+   */
+  model_effort_tier?: string | null;
   /** Last update timestamp. */
   updated_at: string;
 }

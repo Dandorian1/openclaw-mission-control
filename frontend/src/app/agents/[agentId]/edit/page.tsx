@@ -94,6 +94,9 @@ export default function EditAgentPage() {
   const [heartbeatEvery, setHeartbeatEvery] = useState<string | undefined>(
     undefined,
   );
+  const [modelEffortTier, setModelEffortTier] = useState<string | undefined>(
+    undefined,
+  );
   const [identityProfile, setIdentityProfile] = useState<
     IdentityProfile | undefined
   >(undefined);
@@ -178,6 +181,8 @@ export default function EditAgentPage() {
   const resolvedIsGatewayMain =
     isGatewayMain ?? Boolean(loadedAgent?.is_gateway_main);
   const resolvedHeartbeatEvery = heartbeatEvery ?? loadedHeartbeat.every;
+  const resolvedModelEffortTier =
+    modelEffortTier ?? (loadedAgent?.model_effort_tier as string | undefined) ?? "";
   const resolvedIdentityProfile = identityProfile ?? loadedIdentityProfile;
 
   const resolvedBoardId = useMemo(() => {
@@ -231,6 +236,7 @@ export default function EditAgentPage() {
         loadedAgent.identity_profile,
         resolvedIdentityProfile,
       ) as unknown as Record<string, unknown> | null,
+      model_effort_tier: resolvedModelEffortTier.trim() || null,
     };
     if (!resolvedIsGatewayMain) {
       payload.board_id = resolvedBoardId || null;
@@ -377,6 +383,35 @@ export default function EditAgentPage() {
               </div>
             </div>
           </div>
+          <div className="mt-4 grid gap-6 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-strong">
+                Model effort
+              </label>
+              <Select
+                value={resolvedModelEffortTier || "default"}
+                onValueChange={(value) =>
+                  setModelEffortTier(value === "default" ? "" : value)
+                }
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Gateway default" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Gateway default</SelectItem>
+                  <SelectItem value="low">Low — fast, lightweight</SelectItem>
+                  <SelectItem value="medium">Medium — balanced</SelectItem>
+                  <SelectItem value="high">High — most capable</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted">
+                Controls which model tier this agent uses. Leave as gateway
+                default unless this agent has specific performance needs.
+              </p>
+            </div>
+          </div>
+
           <div className="mt-6 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-4">
             <label className="flex items-start gap-3 text-sm text-strong">
               <input

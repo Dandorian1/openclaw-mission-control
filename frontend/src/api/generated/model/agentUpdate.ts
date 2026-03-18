@@ -27,4 +27,9 @@ export interface AgentUpdate {
   soul_template?: string | null;
   /** Optional replacement lifecycle status. */
   status?: string | null;
+  /**
+   * Optional model effort tier override.
+   * Accepted values: 'low', 'medium', 'high', or null to clear.
+   */
+  model_effort_tier?: string | null;
 }
