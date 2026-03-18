@@ -2166,6 +2166,16 @@ async def _lead_apply_status(
         update.task.status = target_status
         return
 
+    # Leads may move inbox → in_progress when delegating (assigning to a worker).
+    is_delegation = (
+        update.task.status == "inbox"
+        and target_status == "in_progress"
+        and "assigned_agent_id" in update.updates
+    )
+    if is_delegation:
+        update.task.status = target_status
+        return
+
     # Standard lead gate: leads can only change status from review.
     if update.task.status != "review":
         raise HTTPException(
