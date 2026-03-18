@@ -1046,6 +1046,7 @@ async def delete_task(
     agent_ctx: AgentAuthContext = AGENT_CTX_DEP,
 ) -> OkResponse:
     """Delete a task after board-lead authorization checks."""
+    await _require_board_not_paused(task.board_id, session)
     _guard_task_access(agent_ctx, task)
     _require_board_lead(agent_ctx)
     if task.board_id is None:
@@ -1749,6 +1750,7 @@ async def update_agent_soul(
 
     Lead-only endpoint. Persists as `soul_template` for future reprovisioning.
     """
+    await _require_board_not_paused(board.id, session)
     _guard_board_access(agent_ctx, board)
     _require_board_lead(agent_ctx)
     coordination = GatewayCoordinationService(session)
@@ -1840,6 +1842,7 @@ async def delete_board_agent(
 
     Cleans up runtime/session state through lifecycle services.
     """
+    await _require_board_not_paused(board.id, session)
     _guard_board_access(agent_ctx, board)
     _require_board_lead(agent_ctx)
     service = AgentLifecycleService(session)
