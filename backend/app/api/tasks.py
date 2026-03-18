@@ -12,7 +12,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import asc, desc, or_
-from sqlmodel import col, select
+from sqlmodel import col, func, select
 from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import (
@@ -2074,10 +2074,13 @@ async def _lead_apply_assignment(
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     if agent.is_board_lead:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Board leads cannot assign tasks to themselves.",
-        )
+        # Allow self-assignment when the lead is the sole agent on the board.
+        has_workers = await _board_has_workers(session, board_id=update.board_id)
+        if has_workers:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Board leads cannot assign tasks to themselves.",
+            )
     if agent.board_id and update.task.board_id and agent.board_id != update.task.board_id:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT)
     update.task.assigned_agent_id = agent.id
@@ -2111,6 +2114,25 @@ async def _last_worker_who_moved_task_to_review(
     return None
 
 
+async def _board_has_workers(session: AsyncSession, *, board_id: UUID) -> bool:
+    """Return True if the board has at least one non-lead agent."""
+    statement = (
+        select(func.count(col(Agent.id)))
+        .where(col(Agent.board_id) == board_id)
+        .where(col(Agent.is_board_lead).is_(False))
+    )
+    count = (await session.exec(statement)).one()
+    return int(count or 0) > 0
+
+
+# Valid status transitions when a lead acts as a solo worker (no workers on board).
+_LEAD_SOLO_VALID_TRANSITIONS: dict[str, set[str]] = {
+    "inbox": {"in_progress"},
+    "in_progress": {"review", "inbox"},
+    "review": {"done", "inbox"},
+}
+
+
 async def _lead_apply_status(
     session: AsyncSession,
     *,
@@ -2121,6 +2143,30 @@ async def _lead_apply_status(
     lead_agent = update.actor.agent
     if "status" not in update.updates:
         return
+    target_status = _required_status_value(update.updates["status"])
+
+    # When the board has no worker agents, the lead must be able to drive
+    # tasks through the full workflow (inbox → in_progress → review → done).
+    has_workers = await _board_has_workers(session, board_id=update.board_id)
+    if not has_workers:
+        allowed_targets = _LEAD_SOLO_VALID_TRANSITIONS.get(update.task.status, set())
+        if target_status not in allowed_targets:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Lead solo-worker status gate failed: `{update.task.status}` can move to "
+                    f"{sorted(allowed_targets)} (requested: `{target_status}`)."
+                ),
+            )
+        if target_status == "in_progress":
+            update.task.assigned_agent_id = lead_agent.id
+            update.task.in_progress_at = utcnow()
+        elif target_status == "inbox":
+            update.task.in_progress_at = None
+        update.task.status = target_status
+        return
+
+    # Standard lead gate: leads can only change status from review.
     if update.task.status != "review":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -2129,7 +2175,6 @@ async def _lead_apply_status(
                 f"task status is `review` (current: `{update.task.status}`)."
             ),
         )
-    target_status = _required_status_value(update.updates["status"])
     if target_status not in {"done", "inbox"}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
