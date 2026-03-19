@@ -94,20 +94,18 @@ export function DashboardSidebar() {
                 <Activity className="h-4 w-4" />
                 Live feed
               </Link>
-              {isAdmin ? (
-                <Link
-                  href="/usage"
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-strong transition",
-                    pathname.startsWith("/usage")
-                      ? "bg-[color:var(--accent-soft)] text-[color:var(--accent)] font-medium"
-                      : "hover:bg-[color:var(--surface-strong)]",
-                  )}
-                >
-                  <Gauge className="h-4 w-4" />
-                  AI Usage
-                </Link>
-              ) : null}
+              <Link
+                href="/usage"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-strong transition",
+                  pathname.startsWith("/usage")
+                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent)] font-medium"
+                    : "hover:bg-[color:var(--surface-strong)]",
+                )}
+              >
+                <Gauge className="h-4 w-4" />
+                AI Usage
+              </Link>
             </div>
           </div>
 

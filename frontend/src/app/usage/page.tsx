@@ -90,7 +90,7 @@ export default function UsagePage() {
     ApiError
   >(undefined, {
     query: {
-      enabled: Boolean(isSignedIn && isAdmin),
+      enabled: Boolean(isSignedIn),
       refetchInterval: 60_000,
     },
   });
@@ -102,7 +102,7 @@ export default function UsagePage() {
     ApiError
   >(undefined, {
     query: {
-      enabled: Boolean(isSignedIn && isAdmin),
+      enabled: Boolean(isSignedIn),
       refetchInterval: 60_000,
     },
   });
@@ -113,7 +113,7 @@ export default function UsagePage() {
     ApiError
   >(undefined, {
     query: {
-      enabled: Boolean(isSignedIn && isAdmin),
+      enabled: Boolean(isSignedIn),
       refetchInterval: 30_000,
     },
   });
