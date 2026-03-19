@@ -181,8 +181,18 @@ export default function GatewayDetailPage() {
         if (typeof m === "string") return m;
         if (m && typeof m === "object") {
           const obj = m as Record<string, unknown>;
-          return typeof obj.id === "string" ? obj.id
+          const slug =
+            typeof obj.id === "string" ? obj.id
             : typeof obj.model === "string" ? obj.model : null;
+          const provider =
+            typeof obj.provider === "string" ? obj.provider : null;
+          // Normalize to provider/model format to match config/models response.
+          // models.list returns bare slugs (e.g. "claude-sonnet-4-6") while
+          // config/models returns provider-prefixed IDs ("anthropic/claude-sonnet-4-6").
+          // Without normalization the dropdown value never matches the saved value.
+          return slug && provider && !slug.includes("/")
+            ? `${provider}/${slug}`
+            : slug;
         }
         return null;
       })
