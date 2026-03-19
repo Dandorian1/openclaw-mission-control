@@ -8,6 +8,9 @@ from uuid import UUID, uuid4
 from sqlalchemy import JSON, Column, UniqueConstraint
 from sqlmodel import Field
 
+SKILL_NAME_MAX_LEN = 255
+SKILL_DESCRIPTION_MAX_LEN = 2000
+
 from app.core.time import utcnow
 from app.models.base import QueryModel
 from app.models.tenancy import TenantScoped
@@ -29,8 +32,8 @@ class MarketplaceSkill(TenantScoped, table=True):
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     organization_id: UUID = Field(foreign_key="organizations.id", index=True)
-    name: str
-    description: str | None = Field(default=None)
+    name: str = Field(max_length=SKILL_NAME_MAX_LEN)
+    description: str | None = Field(default=None, max_length=SKILL_DESCRIPTION_MAX_LEN)
     category: str | None = Field(default=None)
     risk: str | None = Field(default=None)
     source: str | None = Field(default=None)
@@ -57,8 +60,8 @@ class SkillPack(TenantScoped, table=True):
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     organization_id: UUID = Field(foreign_key="organizations.id", index=True)
-    name: str
-    description: str | None = Field(default=None)
+    name: str = Field(max_length=SKILL_NAME_MAX_LEN)
+    description: str | None = Field(default=None, max_length=SKILL_DESCRIPTION_MAX_LEN)
     source_url: str
     branch: str = Field(default="main")
     metadata_: dict[str, object] = Field(

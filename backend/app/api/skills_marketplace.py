@@ -28,6 +28,8 @@ from app.schemas.skills_marketplace import (
     MarketplaceSkillCardRead,
     MarketplaceSkillCreate,
     MarketplaceSkillRead,
+    SKILL_DESCRIPTION_MAX_LEN,
+    SKILL_NAME_MAX_LEN,
     SkillPackCreate,
     SkillPackRead,
     SkillPackSyncResponse,
@@ -89,13 +91,22 @@ def _skills_install_dir(workspace_root: str) -> str:
     return f"{normalized}/skills"
 
 
+def _truncate_optional_text(value: str | None, *, max_len: int) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    return normalized[:max_len]
+
+
 def _infer_skill_name(source_url: str) -> str:
     parsed = urlparse(source_url)
     path = parsed.path.rstrip("/")
     candidate = path.rsplit("/", maxsplit=1)[-1] if path else parsed.netloc
     candidate = unquote(candidate).removesuffix(".git").replace("-", " ").replace("_", " ")
     if candidate.strip():
-        return candidate.strip()
+        return candidate.strip()[:SKILL_NAME_MAX_LEN]
     return "Skill"
 
 
@@ -935,11 +946,16 @@ def _apply_pack_candidate_updates(
     candidate: PackSkillCandidate,
 ) -> bool:
     changed = False
-    if existing.name != candidate.name:
-        existing.name = candidate.name
+    normalized_name = candidate.name[:SKILL_NAME_MAX_LEN]
+    normalized_description = _truncate_optional_text(
+        candidate.description,
+        max_len=SKILL_DESCRIPTION_MAX_LEN,
+    )
+    if existing.name != normalized_name:
+        existing.name = normalized_name
         changed = True
-    if existing.description != candidate.description:
-        existing.description = candidate.description
+    if existing.description != normalized_description:
+        existing.description = normalized_description
         changed = True
     if existing.category != candidate.category:
         existing.category = candidate.category
@@ -1330,8 +1346,11 @@ async def sync_skill_pack(
                 MarketplaceSkill(
                     organization_id=ctx.organization.id,
                     source_url=candidate.source_url,
-                    name=candidate.name,
-                    description=candidate.description,
+                    name=candidate.name[:SKILL_NAME_MAX_LEN],
+                    description=_truncate_optional_text(
+                        candidate.description,
+                        max_len=SKILL_DESCRIPTION_MAX_LEN,
+                    ),
                     category=candidate.category,
                     risk=candidate.risk,
                     source=candidate.source,

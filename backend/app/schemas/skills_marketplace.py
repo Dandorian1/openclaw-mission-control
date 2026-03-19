@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import AnyHttpUrl
+from pydantic import AnyHttpUrl, field_validator
 from sqlmodel import Field, SQLModel
 from sqlmodel._compat import SQLModelConfig
 
@@ -13,23 +13,46 @@ from app.schemas.common import NonEmptyStr
 
 RUNTIME_ANNOTATION_TYPES = (datetime, UUID, NonEmptyStr)
 
+SKILL_NAME_MAX_LEN = 255
+SKILL_DESCRIPTION_MAX_LEN = 2000
+
 
 class MarketplaceSkillCreate(SQLModel):
     """Payload used to register a skill URL in the organization marketplace."""
 
     source_url: AnyHttpUrl
-    name: NonEmptyStr | None = None
-    description: str | None = None
+    name: NonEmptyStr | None = Field(default=None, max_length=SKILL_NAME_MAX_LEN)
+    description: str | None = Field(default=None, max_length=SKILL_DESCRIPTION_MAX_LEN)
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def normalize_description(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+        return value  # pragma: no cover
 
 
 class SkillPackCreate(SQLModel):
     """Payload used to register a pack URL in the organization."""
 
     source_url: AnyHttpUrl
-    name: NonEmptyStr | None = None
-    description: str | None = None
+    name: NonEmptyStr | None = Field(default=None, max_length=SKILL_NAME_MAX_LEN)
+    description: str | None = Field(default=None, max_length=SKILL_DESCRIPTION_MAX_LEN)
     branch: str = "main"
     metadata_: dict[str, object] = Field(default_factory=dict, alias="metadata")
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def normalize_description(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+        return value  # pragma: no cover
 
     model_config = SQLModelConfig(validate_by_name=True)
 
