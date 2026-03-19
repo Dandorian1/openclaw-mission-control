@@ -376,53 +376,77 @@ export default function UsagePage() {
               {providerUsage.providers.length > 0 ? (
                 <div className="space-y-3">
                   {providerUsage.providers.map((provider, idx) => {
-                    const name = (provider.name || provider.provider || provider.id || `Provider ${idx + 1}`) as string;
-                    const entries = (provider.entries || provider.windows || provider.limits) as Record<string, unknown>[] | undefined;
-                    const text = provider.text as string | undefined;
+                    const displayName = (provider.displayName || provider.name || provider.provider || `Provider ${idx + 1}`) as string;
+                    const plan = provider.plan as string | undefined;
+                    const windows = provider.windows as { label: string; usedPercent: number; resetAt?: number }[] | undefined;
                     const error = provider.error as string | undefined;
+
+                    const formatResetTime = (resetAt: number) => {
+                      const diff = resetAt - Date.now();
+                      if (diff <= 0) return "now";
+                      const hours = Math.floor(diff / 3600000);
+                      const mins = Math.floor((diff % 3600000) / 60000);
+                      if (hours > 0) return `${hours}h ${mins}m`;
+                      return `${mins}m`;
+                    };
+
                     return (
-                      <div key={idx} className="rounded-lg border border-[color:var(--border)] p-3">
-                        <p className="text-sm font-medium text-strong">{name}</p>
+                      <div key={idx} className="rounded-lg border border-[color:var(--border)] p-4">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-strong">{displayName}</p>
+                          {plan ? (
+                            <span className="inline-flex items-center rounded-md bg-[color:var(--surface-strong)] px-2 py-0.5 text-xs text-muted">
+                              {plan}
+                            </span>
+                          ) : null}
+                        </div>
                         {error ? (
-                          <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">{error}</p>
-                        ) : text ? (
-                          <p className="mt-1 text-xs text-muted whitespace-pre-wrap font-mono">{text}</p>
-                        ) : entries && Array.isArray(entries) ? (
-                          <div className="mt-2 space-y-1">
-                            {entries.map((entry, eidx) => {
-                              const label = (entry.label || entry.window || entry.name || `Window ${eidx + 1}`) as string;
-                              const pct = entry.percentLeft as number | undefined;
-                              const resets = entry.resetsIn as string | undefined;
+                          <div className="mt-2 flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 dark:bg-amber-950">
+                            <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                            <p className="text-xs text-amber-700 dark:text-amber-300">{error}</p>
+                          </div>
+                        ) : windows && Array.isArray(windows) && windows.length > 0 ? (
+                          <div className="mt-3 space-y-3">
+                            {windows.map((w, widx) => {
+                              const remaining = 100 - (w.usedPercent || 0);
                               return (
-                                <div key={eidx} className="flex items-center justify-between text-xs">
-                                  <span className="text-muted">{label}</span>
-                                  <div className="flex items-center gap-2">
-                                    {pct !== undefined ? (
-                                      <>
-                                        <div className="h-2 w-20 rounded-full bg-[color:var(--surface-strong)] overflow-hidden">
-                                          <div
-                                            className={cn(
-                                              "h-full rounded-full transition-all",
-                                              pct > 50 ? "bg-emerald-500" : pct > 20 ? "bg-amber-500" : "bg-rose-500",
-                                            )}
-                                            style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
-                                          />
-                                        </div>
-                                        <span className="text-muted w-12 text-right">{pct}%</span>
-                                      </>
-                                    ) : null}
-                                    {resets ? (
-                                      <span className="text-muted">resets {resets}</span>
-                                    ) : null}
+                                <div key={widx}>
+                                  <div className="flex items-center justify-between text-xs mb-1.5">
+                                    <span className="font-medium text-strong">{w.label} window</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className={cn(
+                                        "font-medium",
+                                        remaining > 50 ? "text-emerald-600 dark:text-emerald-400" :
+                                        remaining > 20 ? "text-amber-600 dark:text-amber-400" :
+                                        "text-rose-600 dark:text-rose-400",
+                                      )}>
+                                        {remaining}% remaining
+                                      </span>
+                                      {w.resetAt ? (
+                                        <span className="text-muted flex items-center gap-1">
+                                          <Clock className="h-3 w-3" />
+                                          resets in {formatResetTime(w.resetAt)}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                  <div className="h-2.5 w-full rounded-full bg-[color:var(--surface-strong)] overflow-hidden">
+                                    <div
+                                      className={cn(
+                                        "h-full rounded-full transition-all duration-500",
+                                        remaining > 50 ? "bg-emerald-500" :
+                                        remaining > 20 ? "bg-amber-500" :
+                                        "bg-rose-500",
+                                      )}
+                                      style={{ width: `${Math.max(0, Math.min(100, remaining))}%` }}
+                                    />
                                   </div>
                                 </div>
                               );
                             })}
                           </div>
                         ) : (
-                          <pre className="mt-1 text-xs text-muted whitespace-pre-wrap font-mono overflow-x-auto">
-                            {JSON.stringify(provider, null, 2)}
-                          </pre>
+                          <p className="mt-2 text-xs text-muted">No usage windows available</p>
                         )}
                       </div>
                     );
