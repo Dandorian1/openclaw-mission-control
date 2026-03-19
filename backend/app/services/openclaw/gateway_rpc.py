@@ -640,3 +640,11 @@ async def usage_status(
 ) -> object:
     """Fetch provider usage/quota status from the gateway."""
     return await openclaw_call("usage.status", config=config)
+
+
+async def usage_cost(
+    *,
+    config: GatewayConfig,
+) -> object:
+    """Fetch daily cost/token usage data from the gateway."""
+    return await openclaw_call("usage.cost", config=config)

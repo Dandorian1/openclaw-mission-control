@@ -74,6 +74,13 @@ interface ProviderUsageData {
   error?: string | null;
 }
 
+interface CostData {
+  daily: { date?: string; totalTokens?: number; totalCost?: number; input?: number; output?: number; cacheRead?: number; cacheWrite?: number }[];
+  totals?: { totalTokens?: number; totalCost?: number; input?: number; output?: number; cacheRead?: number; cacheWrite?: number } | null;
+  days?: number | null;
+  error?: string | null;
+}
+
 export default function UsagePage() {
   const { isSignedIn } = useAuth();
   const { isAdmin } = useOrganizationMembership(isSignedIn);
@@ -125,6 +132,9 @@ export default function UsagePage() {
   const [providerUsage, setProviderUsage] = useState<ProviderUsageData | null>(null);
   const [providerLoading, setProviderLoading] = useState(false);
 
+  // Daily cost data
+  const [costData, setCostData] = useState<CostData | null>(null);
+
   const fetchUsage = async () => {
     if (!firstBoardId) return;
     setUsageLoading(true);
@@ -143,6 +153,21 @@ export default function UsagePage() {
       setUsageError("Failed to load usage data");
     } finally {
       setUsageLoading(false);
+    }
+  };
+
+  const fetchCost = async () => {
+    if (!firstBoardId) return;
+    try {
+      const res = await customFetch<{ data: CostData; status: number }>(
+        `/api/v1/gateways/usage/cost?board_id=${firstBoardId}`,
+        { method: "GET" },
+      );
+      if (res.status === 200) {
+        setCostData(res.data);
+      }
+    } catch {
+      // silent
     }
   };
 
@@ -168,6 +193,7 @@ export default function UsagePage() {
     if (firstBoardId && isSignedIn && isAdmin) {
       void fetchUsage();
       void fetchProviderUsage();
+      void fetchCost();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firstBoardId, isSignedIn, isAdmin]);
@@ -297,7 +323,7 @@ export default function UsagePage() {
             </p>
           </div>
           <button
-            onClick={() => { void fetchUsage(); void fetchProviderUsage(); }}
+            onClick={() => { void fetchUsage(); void fetchProviderUsage(); void fetchCost(); }}
             disabled={usageLoading || providerLoading}
             className={cn(
               "flex items-center gap-2 rounded-lg border border-[color:var(--border)] px-3 py-2 text-sm text-strong transition",
@@ -496,6 +522,59 @@ export default function UsagePage() {
             <p className="text-sm text-muted animate-pulse">Loading provider usage limits…</p>
           </div>
         ) : null}
+
+        {/* Daily Cost Breakdown */}
+        {costData?.daily && costData.daily.length > 0 && (
+          <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] shadow-sm">
+            <div className="border-b border-[color:var(--border)] px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-strong">Daily Cost & Token Usage</h2>
+                  <p className="text-xs text-muted mt-0.5">
+                    {costData.days ? `Last ${costData.days} days` : "Recent usage"}{costData.totals?.totalCost ? ` · Total: $${costData.totals.totalCost.toFixed(2)}` : ""}
+                  </p>
+                </div>
+                {costData.totals ? (
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-strong">${costData.totals.totalCost?.toFixed(2) ?? "0.00"}</p>
+                    <p className="text-xs text-muted">{formatTokens(costData.totals.totalTokens || 0)} tokens</p>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[color:var(--border)] text-left text-muted">
+                    <th className="px-4 py-3 font-medium">Date</th>
+                    <th className="px-4 py-3 font-medium text-right">Input</th>
+                    <th className="px-4 py-3 font-medium text-right">Output</th>
+                    <th className="px-4 py-3 font-medium text-right">Cache Read</th>
+                    <th className="px-4 py-3 font-medium text-right">Total Tokens</th>
+                    <th className="px-4 py-3 font-medium text-right">Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...costData.daily].reverse().map((day) => (
+                    <tr
+                      key={day.date}
+                      className="border-b border-[color:var(--border)] last:border-b-0 hover:bg-[color:var(--surface-strong)] transition"
+                    >
+                      <td className="px-4 py-3 font-medium text-strong">{day.date || "—"}</td>
+                      <td className="px-4 py-3 text-right text-muted">{formatTokens(day.input || 0)}</td>
+                      <td className="px-4 py-3 text-right text-muted">{formatTokens(day.output || 0)}</td>
+                      <td className="px-4 py-3 text-right text-muted">{formatTokens(day.cacheRead || 0)}</td>
+                      <td className="px-4 py-3 text-right font-medium text-strong">{formatTokens(day.totalTokens || 0)}</td>
+                      <td className="px-4 py-3 text-right font-medium text-strong">
+                        {day.totalCost ? `$${day.totalCost.toFixed(2)}` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Error state */}
         {(usageError || usageData?.error) && (

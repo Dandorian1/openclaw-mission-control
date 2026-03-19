@@ -132,6 +132,15 @@ class GatewayProviderUsageResponse(SQLModel):
     error: str | None = None
 
 
+class GatewayCostResponse(SQLModel):
+    """Daily cost and token usage data from the gateway."""
+
+    daily: list[dict] = Field(default_factory=list)
+    totals: dict | None = None
+    days: int | None = None
+    error: str | None = None
+
+
 class GatewayModelConfigUpdate(SQLModel):
     """Payload for updating the gateway default model configuration.
 

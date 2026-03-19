@@ -14,6 +14,7 @@ from app.models.gateways import Gateway
 from app.schemas.common import OkResponse
 from app.schemas.gateway_api import (
     GatewayCommandsResponse,
+    GatewayCostResponse,
     GatewayModelConfig,
     GatewayModelConfigUpdate,
     GatewayModelsResponse,
@@ -34,6 +35,7 @@ from app.services.openclaw.gateway_rpc import (
     OpenClawGatewayError,
     openclaw_call,
     sessions_usage,
+    usage_cost,
     usage_status,
 )
 from app.services.openclaw.session_service import GatewaySessionService
@@ -277,6 +279,36 @@ async def gateway_provider_usage(
             return GatewayProviderUsageResponse(raw={"data": raw} if raw else None)
     except OpenClawGatewayError as exc:
         return GatewayProviderUsageResponse(error=str(exc))
+
+
+@router.get("/usage/cost", response_model=GatewayCostResponse)
+async def gateway_usage_cost(
+    board_id: str | None = BOARD_ID_QUERY,
+    session: AsyncSession = SESSION_DEP,
+    auth: AuthContext = AUTH_DEP,
+    _ctx: OrganizationContext = ORG_ADMIN_DEP,
+) -> GatewayCostResponse:
+    """Return daily cost and token usage from the gateway.
+
+    Calls the ``usage.cost`` RPC to get aggregated daily spend data.
+    Works independently of provider OAuth scopes.
+    """
+    service = GatewaySessionService(session)
+    try:
+        _board, config, _main = await service.require_gateway(
+            board_id,
+            user=auth.user,
+        )
+        raw = await usage_cost(config=config)
+        if isinstance(raw, dict):
+            return GatewayCostResponse(
+                daily=raw.get("daily") or [],
+                totals=raw.get("totals"),
+                days=raw.get("days"),
+            )
+        return GatewayCostResponse()
+    except OpenClawGatewayError as exc:
+        return GatewayCostResponse(error=str(exc))
 
 
 @router.get("/{gateway_id}/config/models", response_model=GatewayModelConfig)
