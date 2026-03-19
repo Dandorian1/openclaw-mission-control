@@ -83,7 +83,7 @@ interface CostData {
 
 export default function UsagePage() {
   const { isSignedIn } = useAuth();
-  const { isAdmin } = useOrganizationMembership(isSignedIn);
+  useOrganizationMembership(isSignedIn);
 
   const boardsQuery = useListBoardsApiV1BoardsGet<
     listBoardsApiV1BoardsGetResponse,
@@ -190,13 +190,14 @@ export default function UsagePage() {
   };
 
   useEffect(() => {
-    if (firstBoardId && isSignedIn && isAdmin) {
+    if (firstBoardId && isSignedIn) {
       void fetchUsage();
       void fetchProviderUsage();
       void fetchCost();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firstBoardId, isSignedIn, isAdmin]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstBoardId, isSignedIn]);
 
   // Aggregate session stats
   const sessionStats = useMemo(() => {
@@ -466,18 +467,26 @@ export default function UsagePage() {
                               <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
                                 {error.includes("user:profile")
                                   ? "Usage data unavailable — token missing required scope"
+                                  : error.includes("401") || error.includes("Invalid bearer token") || error.includes("Unauthorized")
+                                  ? "Usage data unavailable — auth token cannot access usage API"
                                   : error}
                               </p>
                             </div>
-                            {error.includes("user:profile") ? (
+                            {error.includes("user:profile") || error.includes("401") || error.includes("Invalid bearer token") || error.includes("Unauthorized") ? (
                               <div className="mt-2 text-xs text-amber-600 dark:text-amber-400 space-y-1">
-                                <p>The current auth token doesn&apos;t include the <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">user:profile</code> scope needed for usage data.</p>
-                                <p className="font-medium">To fix, set one of these in your gateway config:</p>
+                                <p>
+                                  {error.includes("401") || error.includes("Invalid bearer token") || error.includes("Unauthorized")
+                                    ? <>The current auth token (setup-token or API key) doesn&apos;t support querying usage limits. Usage data requires OAuth or a web session.</>
+                                    : <>The current auth token doesn&apos;t include the <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">user:profile</code> scope needed for usage data.</>
+                                  }
+                                </p>
+                                <p className="font-medium">To fix, try one of these:</p>
                                 <ul className="list-disc pl-4 space-y-0.5">
-                                  <li><code className="rounded bg-amber-100 px-1 dark:bg-amber-900">CLAUDE_WEB_SESSION_KEY</code> — copy the sessionKey cookie from claude.ai</li>
-                                  <li><code className="rounded bg-amber-100 px-1 dark:bg-amber-900">CLAUDE_WEB_COOKIE</code> — full cookie string from claude.ai</li>
+                                  <li>Run <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">claude login</code> (full OAuth flow, not setup-token) for broader scopes including usage</li>
+                                  <li>Set <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">CLAUDE_WEB_SESSION_KEY</code> — copy the sessionKey cookie from claude.ai</li>
+                                  <li>Set <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">CLAUDE_WEB_COOKIE</code> — full cookie string from claude.ai</li>
                                 </ul>
-                                <p className="text-amber-500 dark:text-amber-500">Or run <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">claude login</code> (full OAuth, not setup-token) for broader scopes.</p>
+                                <p className="text-amber-500 dark:text-amber-500">Note: chat/completions still work fine — only usage limit visibility is affected.</p>
                               </div>
                             ) : null}
                           </div>
