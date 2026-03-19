@@ -17,6 +17,7 @@ from app.schemas.gateway_api import (
     GatewayModelConfig,
     GatewayModelConfigUpdate,
     GatewayModelsResponse,
+    GatewayProviderUsageResponse,
     GatewayResolveQuery,
     GatewaySessionHistoryResponse,
     GatewaySessionMessageRequest,
@@ -33,6 +34,7 @@ from app.services.openclaw.gateway_rpc import (
     OpenClawGatewayError,
     openclaw_call,
     sessions_usage,
+    usage_status,
 )
 from app.services.openclaw.session_service import GatewaySessionService
 from app.services.organizations import OrganizationContext
@@ -239,6 +241,42 @@ async def gateway_usage(
         return GatewayUsageResponse(usage=usage_list, summary=summary)
     except OpenClawGatewayError as exc:
         return GatewayUsageResponse(error=str(exc))
+
+
+@router.get("/usage/providers", response_model=GatewayProviderUsageResponse)
+async def gateway_provider_usage(
+    board_id: str | None = BOARD_ID_QUERY,
+    session: AsyncSession = SESSION_DEP,
+    auth: AuthContext = AUTH_DEP,
+    _ctx: OrganizationContext = ORG_ADMIN_DEP,
+) -> GatewayProviderUsageResponse:
+    """Return provider usage/quota status from the gateway.
+
+    Calls the ``usage.status`` RPC to get quota windows for OAuth and
+    API-key backed providers (e.g. Claude weekly limits, ChatGPT Plus
+    usage windows).
+    """
+    service = GatewaySessionService(session)
+    try:
+        _board, config, _main = await service.require_gateway(
+            board_id,
+            user=auth.user,
+        )
+        raw = await usage_status(config=config)
+        if isinstance(raw, dict):
+            providers = raw.get("providers") or raw.get("entries") or raw.get("items") or []
+            if not isinstance(providers, list):
+                providers = [raw]
+            return GatewayProviderUsageResponse(
+                providers=providers,
+                raw=raw,
+            )
+        elif isinstance(raw, list):
+            return GatewayProviderUsageResponse(providers=raw)
+        else:
+            return GatewayProviderUsageResponse(raw={"data": raw} if raw else None)
+    except OpenClawGatewayError as exc:
+        return GatewayProviderUsageResponse(error=str(exc))
 
 
 @router.get("/{gateway_id}/config/models", response_model=GatewayModelConfig)

@@ -124,6 +124,14 @@ class GatewayUsageResponse(SQLModel):
     error: str | None = None
 
 
+class GatewayProviderUsageResponse(SQLModel):
+    """Provider usage/quota status from the gateway."""
+
+    providers: list[dict] = Field(default_factory=list)
+    raw: dict | None = None
+    error: str | None = None
+
+
 class GatewayModelConfigUpdate(SQLModel):
     """Payload for updating the gateway default model configuration.
 

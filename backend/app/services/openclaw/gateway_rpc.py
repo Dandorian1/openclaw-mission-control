@@ -632,3 +632,11 @@ async def sessions_usage(
     if include_context_weight is not None:
         params["includeContextWeight"] = include_context_weight
     return await openclaw_call("sessions.usage", params, config=config)
+
+
+async def usage_status(
+    *,
+    config: GatewayConfig,
+) -> object:
+    """Fetch provider usage/quota status from the gateway."""
+    return await openclaw_call("usage.status", config=config)

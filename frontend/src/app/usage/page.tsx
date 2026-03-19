@@ -62,6 +62,12 @@ interface SessionEntry {
   [k: string]: unknown;
 }
 
+interface ProviderUsageData {
+  providers: Record<string, unknown>[];
+  raw?: Record<string, unknown> | null;
+  error?: string | null;
+}
+
 export default function UsagePage() {
   const { isSignedIn } = useAuth();
   const { isAdmin } = useOrganizationMembership(isSignedIn);
@@ -109,6 +115,10 @@ export default function UsagePage() {
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageError, setUsageError] = useState<string | null>(null);
 
+  // Provider usage/quota data
+  const [providerUsage, setProviderUsage] = useState<ProviderUsageData | null>(null);
+  const [providerLoading, setProviderLoading] = useState(false);
+
   const fetchUsage = async () => {
     if (!firstBoardId) return;
     setUsageLoading(true);
@@ -130,9 +140,28 @@ export default function UsagePage() {
     }
   };
 
+  const fetchProviderUsage = async () => {
+    if (!firstBoardId) return;
+    setProviderLoading(true);
+    try {
+      const res = await customFetch<{ data: ProviderUsageData; status: number }>(
+        `/api/v1/gateways/usage/providers?board_id=${firstBoardId}`,
+        { method: "GET" },
+      );
+      if (res.status === 200) {
+        setProviderUsage(res.data);
+      }
+    } catch {
+      // silent — provider usage is supplemental
+    } finally {
+      setProviderLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (firstBoardId && isSignedIn && isAdmin) {
       void fetchUsage();
+      void fetchProviderUsage();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firstBoardId, isSignedIn, isAdmin]);
@@ -255,15 +284,15 @@ export default function UsagePage() {
             </p>
           </div>
           <button
-            onClick={() => void fetchUsage()}
-            disabled={usageLoading}
+            onClick={() => { void fetchUsage(); void fetchProviderUsage(); }}
+            disabled={usageLoading || providerLoading}
             className={cn(
               "flex items-center gap-2 rounded-lg border border-[color:var(--border)] px-3 py-2 text-sm text-strong transition",
               "hover:bg-[color:var(--surface-strong)]",
               usageLoading && "opacity-50 cursor-not-allowed",
             )}
           >
-            <RefreshCw className={cn("h-4 w-4", usageLoading && "animate-spin")} />
+            <RefreshCw className={cn("h-4 w-4", (usageLoading || providerLoading) && "animate-spin")} />
             Refresh
           </button>
         </div>
@@ -333,6 +362,84 @@ export default function UsagePage() {
             ) : null}
           </div>
         </div>
+
+        {/* Provider Usage / Rate Limits */}
+        {(providerUsage?.raw || providerUsage?.providers?.length) && !providerUsage?.error ? (
+          <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] shadow-sm">
+            <div className="border-b border-[color:var(--border)] px-4 py-3">
+              <h2 className="text-sm font-semibold text-strong">Provider Usage Limits</h2>
+              <p className="text-xs text-muted mt-0.5">
+                Live quota and rate limit status from AI providers
+              </p>
+            </div>
+            <div className="p-4">
+              {providerUsage.providers.length > 0 ? (
+                <div className="space-y-3">
+                  {providerUsage.providers.map((provider, idx) => {
+                    const name = (provider.name || provider.provider || provider.id || `Provider ${idx + 1}`) as string;
+                    const entries = (provider.entries || provider.windows || provider.limits) as Record<string, unknown>[] | undefined;
+                    const text = provider.text as string | undefined;
+                    const error = provider.error as string | undefined;
+                    return (
+                      <div key={idx} className="rounded-lg border border-[color:var(--border)] p-3">
+                        <p className="text-sm font-medium text-strong">{name}</p>
+                        {error ? (
+                          <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">{error}</p>
+                        ) : text ? (
+                          <p className="mt-1 text-xs text-muted whitespace-pre-wrap font-mono">{text}</p>
+                        ) : entries && Array.isArray(entries) ? (
+                          <div className="mt-2 space-y-1">
+                            {entries.map((entry, eidx) => {
+                              const label = (entry.label || entry.window || entry.name || `Window ${eidx + 1}`) as string;
+                              const pct = entry.percentLeft as number | undefined;
+                              const resets = entry.resetsIn as string | undefined;
+                              return (
+                                <div key={eidx} className="flex items-center justify-between text-xs">
+                                  <span className="text-muted">{label}</span>
+                                  <div className="flex items-center gap-2">
+                                    {pct !== undefined ? (
+                                      <>
+                                        <div className="h-2 w-20 rounded-full bg-[color:var(--surface-strong)] overflow-hidden">
+                                          <div
+                                            className={cn(
+                                              "h-full rounded-full transition-all",
+                                              pct > 50 ? "bg-emerald-500" : pct > 20 ? "bg-amber-500" : "bg-rose-500",
+                                            )}
+                                            style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
+                                          />
+                                        </div>
+                                        <span className="text-muted w-12 text-right">{pct}%</span>
+                                      </>
+                                    ) : null}
+                                    {resets ? (
+                                      <span className="text-muted">resets {resets}</span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <pre className="mt-1 text-xs text-muted whitespace-pre-wrap font-mono overflow-x-auto">
+                            {JSON.stringify(provider, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : providerUsage.raw ? (
+                <pre className="text-xs text-muted whitespace-pre-wrap font-mono overflow-x-auto">
+                  {JSON.stringify(providerUsage.raw, null, 2)}
+                </pre>
+              ) : null}
+            </div>
+          </div>
+        ) : providerLoading ? (
+          <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4 shadow-sm">
+            <p className="text-sm text-muted animate-pulse">Loading provider usage limits…</p>
+          </div>
+        ) : null}
 
         {/* Error state */}
         {(usageError || usageData?.error) && (
