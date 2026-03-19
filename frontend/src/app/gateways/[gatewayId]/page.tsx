@@ -161,10 +161,16 @@ export default function GatewayDetailPage() {
     statusQuery.data?.status === 200 ? statusQuery.data.data : null;
   const isConnected = status?.connected ?? false;
 
+  // Derive board_id for the models query — find the board linked to this gateway
+  const boardIdForModels = useMemo(
+    () => boards.find((b) => b.gateway_id === gatewayId)?.id ?? null,
+    [boards, gatewayId],
+  );
+
   // Available models from gateway (for the fallback dropdown)
   const gatewayModelsQuery = useGatewayModelsApiV1GatewaysModelsGet(
-    undefined,
-    { query: { enabled: Boolean(isSignedIn && isAdmin && gateway && isConnected), retry: false } },
+    boardIdForModels ? { board_id: boardIdForModels } : undefined,
+    { query: { enabled: Boolean(isSignedIn && isAdmin && gateway && isConnected && boardIdForModels), retry: false } },
   );
   const availableModels = useMemo(() => {
     const raw = gatewayModelsQuery.data?.status === 200
