@@ -440,14 +440,32 @@ export default function UsagePage() {
                           ) : null}
                         </div>
                         {error ? (
+                          error.includes("429") || error.includes("Rate limited") ? (
+                          <div className="mt-3 space-y-3">
+                            <div className="flex items-center gap-2 rounded-md bg-rose-50 px-3 py-2 dark:bg-rose-950">
+                              <Zap className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                              <p className="text-xs font-medium text-rose-700 dark:text-rose-300">
+                                Usage cap likely exhausted — provider returning rate limit (429)
+                              </p>
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between text-xs mb-1.5">
+                                <span className="font-medium text-strong">Estimated usage</span>
+                                <span className="font-medium text-rose-600 dark:text-rose-400">~100% used</span>
+                              </div>
+                              <div className="h-2.5 w-full rounded-full bg-[color:var(--surface-strong)] overflow-hidden">
+                                <div className="h-full rounded-full bg-rose-500 transition-all duration-500" style={{ width: "100%" }} />
+                              </div>
+                              <p className="mt-1 text-xs text-muted">Agents are receiving 429 errors. Cap resets automatically — check back later.</p>
+                            </div>
+                          </div>
+                          ) : (
                           <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 dark:bg-amber-950">
                             <div className="flex items-center gap-2">
                               <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                               <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
                                 {error.includes("user:profile")
                                   ? "Usage data unavailable — token missing required scope"
-                                  : error.includes("429") || error.includes("Rate limited")
-                                  ? "Provider is rate limited — usage data temporarily unavailable"
                                   : error}
                               </p>
                             </div>
@@ -463,6 +481,7 @@ export default function UsagePage() {
                               </div>
                             ) : null}
                           </div>
+                          )
                         ) : windows && Array.isArray(windows) && windows.length > 0 ? (
                           <div className="mt-3 space-y-3">
                             {windows.map((w, widx) => {
