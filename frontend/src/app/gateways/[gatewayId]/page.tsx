@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { Input } from "@/components/ui/input";
 
-import { ApiError } from "@/api/mutator";
+import { ApiError, customFetch } from "@/api/mutator";
 import {
   type listBoardsApiV1BoardsGetResponse,
   useListBoardsApiV1BoardsGet,
@@ -203,11 +203,13 @@ export default function GatewayDetailPage() {
   const modelConfigFetcher = async () => {
     if (!gatewayId || !isConnected || modelConfigLoaded) return;
     try {
-      const res = await fetch(`/api/v1/gateways/${gatewayId}/config/models`);
-      if (res.ok) {
-        const data: { primary?: string | null; fallbacks?: string[] } = await res.json();
-        setPrimaryModel(data.primary ?? "");
-        setFallbacks(data.fallbacks ?? []);
+      const res = await customFetch<{ data: { primary?: string | null; fallbacks?: string[] }; status: number }>(
+        `/api/v1/gateways/${gatewayId}/config/models`,
+        { method: "GET" },
+      );
+      if (res.status === 200) {
+        setPrimaryModel(res.data.primary ?? "");
+        setFallbacks(res.data.fallbacks ?? []);
         setModelConfigLoaded(true);
       }
     } catch {
@@ -226,15 +228,18 @@ export default function GatewayDetailPage() {
     setModelSaveError(null);
     setModelSaveSuccess(false);
     try {
-      const res = await fetch(`/api/v1/gateways/${gatewayId}/config/models`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          primary: primaryModel.trim() || null,
-          fallbacks: fallbacks.filter(Boolean),
-        }),
-      });
-      const data = await res.json();
+      const res = await customFetch<{ data: { primary?: string | null; fallbacks?: string[]; error?: string | null }; status: number }>(
+        `/api/v1/gateways/${gatewayId}/config/models`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            primary: primaryModel.trim() || null,
+            fallbacks: fallbacks.filter(Boolean),
+          }),
+        },
+      );
+      const data = res.data;
       if (data.error) {
         setModelSaveError(data.error);
       } else {
