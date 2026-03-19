@@ -31,24 +31,30 @@ import { DashboardShell } from "@/components/templates/DashboardShell";
 import { SignedOutPanel } from "@/components/auth/SignedOutPanel";
 import { cn } from "@/lib/utils";
 
-interface UsageEntry {
-  date?: string;
+interface SessionUsageEntry {
   key?: string;
   label?: string;
   model?: string;
-  provider?: string;
-  inputTokens?: number;
-  outputTokens?: number;
-  totalTokens?: number;
-  cacheReadTokens?: number;
-  cacheWriteTokens?: number;
-  runs?: number;
-  cost?: number;
+  modelProvider?: string;
+  agentId?: string;
+  usage?: {
+    totalTokens?: number;
+    totalCost?: number;
+    input?: number;
+    output?: number;
+    cacheRead?: number;
+    cacheWrite?: number;
+    messageCounts?: { total?: number; user?: number; assistant?: number; toolCalls?: number };
+    latency?: { avgMs?: number; p95Ms?: number };
+    modelUsage?: { provider?: string; model?: string; count?: number; totals?: { totalTokens?: number; totalCost?: number; input?: number; output?: number; cacheRead?: number; cacheWrite?: number } }[];
+    dailyBreakdown?: { date?: string; tokens?: number; cost?: number }[];
+    toolUsage?: { totalCalls?: number; uniqueTools?: number; tools?: { name?: string; count?: number }[] };
+  };
   [k: string]: unknown;
 }
 
 interface UsageData {
-  usage: UsageEntry[];
+  usage: SessionUsageEntry[];
   summary?: Record<string, unknown> | null;
   error?: string | null;
 }
@@ -185,7 +191,7 @@ export default function UsagePage() {
     return { totalSessions, activeSessions, modelCounts };
   }, [sessions]);
 
-  // Aggregate usage stats
+  // Aggregate usage stats from sessions.usage rich data
   const usageStats = useMemo(() => {
     if (!usageData?.usage?.length) return null;
     let totalInput = 0;
@@ -193,29 +199,36 @@ export default function UsagePage() {
     let totalCacheRead = 0;
     let totalRuns = 0;
     let totalCost = 0;
-    const byModel: Record<string, { input: number; output: number; runs: number; cost: number }> = {};
+    let totalMessages = 0;
+    let totalToolCalls = 0;
+    const byModel: Record<string, { input: number; output: number; cacheRead: number; runs: number; cost: number }> = {};
 
     for (const entry of usageData.usage) {
-      const input = entry.inputTokens || 0;
-      const output = entry.outputTokens || 0;
-      const cacheRead = entry.cacheReadTokens || 0;
-      const runs = entry.runs || 0;
-      const cost = entry.cost || 0;
-      totalInput += input;
-      totalOutput += output;
-      totalCacheRead += cacheRead;
-      totalRuns += runs;
-      totalCost += cost;
+      const u = entry.usage;
+      if (!u) continue;
+      totalInput += u.input || 0;
+      totalOutput += u.output || 0;
+      totalCacheRead += u.cacheRead || 0;
+      totalCost += u.totalCost || 0;
+      totalMessages += u.messageCounts?.assistant || 0;
+      totalToolCalls += u.messageCounts?.toolCalls || 0;
 
-      const model = entry.model || entry.provider || "unknown";
-      if (!byModel[model]) byModel[model] = { input: 0, output: 0, runs: 0, cost: 0 };
-      byModel[model].input += input;
-      byModel[model].output += output;
-      byModel[model].runs += runs;
-      byModel[model].cost += cost;
+      // Aggregate by model
+      if (u.modelUsage) {
+        for (const mu of u.modelUsage) {
+          const key = `${mu.provider || ""}/${mu.model || "unknown"}`;
+          if (!byModel[key]) byModel[key] = { input: 0, output: 0, cacheRead: 0, runs: 0, cost: 0 };
+          byModel[key].input += mu.totals?.input || 0;
+          byModel[key].output += mu.totals?.output || 0;
+          byModel[key].cacheRead += mu.totals?.cacheRead || 0;
+          byModel[key].runs += mu.count || 0;
+          byModel[key].cost += mu.totals?.totalCost || 0;
+          totalRuns += mu.count || 0;
+        }
+      }
     }
 
-    return { totalInput, totalOutput, totalCacheRead, totalRuns, totalCost, byModel };
+    return { totalInput, totalOutput, totalCacheRead, totalRuns, totalCost, totalMessages, totalToolCalls, byModel };
   }, [usageData]);
 
   // Build per-agent table from sessions
@@ -350,14 +363,14 @@ export default function UsagePage() {
           <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4 shadow-sm">
             <div className="flex items-center gap-2 text-sm text-muted">
               <Cpu className="h-4 w-4" />
-              Agent Runs
+              Estimated Cost
             </div>
             <p className="mt-2 text-2xl font-bold text-strong">
-              {usageStats ? usageStats.totalRuns : "—"}
+              {usageStats?.totalCost ? `$${usageStats.totalCost.toFixed(2)}` : "—"}
             </p>
-            {usageStats?.totalCost ? (
+            {usageStats ? (
               <p className="mt-1 text-xs text-muted">
-                Est. ${usageStats.totalCost.toFixed(2)}
+                {usageStats.totalRuns} runs · {usageStats.totalMessages} messages · {usageStats.totalToolCalls} tool calls
               </p>
             ) : null}
           </div>
@@ -572,15 +585,16 @@ export default function UsagePage() {
                 <thead>
                   <tr className="border-b border-[color:var(--border)] text-left text-muted">
                     <th className="px-4 py-3 font-medium">Model</th>
-                    <th className="px-4 py-3 font-medium text-right">Input Tokens</th>
-                    <th className="px-4 py-3 font-medium text-right">Output Tokens</th>
+                    <th className="px-4 py-3 font-medium text-right">Input</th>
+                    <th className="px-4 py-3 font-medium text-right">Output</th>
+                    <th className="px-4 py-3 font-medium text-right">Cache Read</th>
                     <th className="px-4 py-3 font-medium text-right">Runs</th>
                     <th className="px-4 py-3 font-medium text-right">Est. Cost</th>
                   </tr>
                 </thead>
                 <tbody>
                   {Object.entries(usageStats.byModel)
-                    .sort(([, a], [, b]) => (b.input + b.output) - (a.input + a.output))
+                    .sort(([, a], [, b]) => b.cost - a.cost)
                     .map(([model, data]) => (
                       <tr
                         key={model}
@@ -589,8 +603,9 @@ export default function UsagePage() {
                         <td className="px-4 py-3 font-medium text-strong">{model}</td>
                         <td className="px-4 py-3 text-right text-muted">{formatTokens(data.input)}</td>
                         <td className="px-4 py-3 text-right text-muted">{formatTokens(data.output)}</td>
+                        <td className="px-4 py-3 text-right text-muted">{formatTokens(data.cacheRead)}</td>
                         <td className="px-4 py-3 text-right text-muted">{data.runs}</td>
-                        <td className="px-4 py-3 text-right text-muted">
+                        <td className="px-4 py-3 text-right font-medium text-strong">
                           {data.cost > 0 ? `$${data.cost.toFixed(2)}` : "—"}
                         </td>
                       </tr>
@@ -601,45 +616,60 @@ export default function UsagePage() {
           </div>
         )}
 
-        {/* Raw Usage Data */}
+        {/* Per-Agent Usage Details */}
         {usageData?.usage && usageData.usage.length > 0 && (
           <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] shadow-sm">
             <div className="border-b border-[color:var(--border)] px-4 py-3">
-              <h2 className="text-sm font-semibold text-strong">Session Usage Details</h2>
+              <h2 className="text-sm font-semibold text-strong">Per-Agent Usage</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[color:var(--border)] text-left text-muted">
-                    <th className="px-4 py-3 font-medium">Session</th>
-                    <th className="px-4 py-3 font-medium">Date</th>
+                    <th className="px-4 py-3 font-medium">Agent</th>
+                    <th className="px-4 py-3 font-medium">Model</th>
                     <th className="px-4 py-3 font-medium text-right">Input</th>
                     <th className="px-4 py-3 font-medium text-right">Output</th>
-                    <th className="px-4 py-3 font-medium text-right">Cache</th>
-                    <th className="px-4 py-3 font-medium text-right">Runs</th>
+                    <th className="px-4 py-3 font-medium text-right">Cache Read</th>
+                    <th className="px-4 py-3 font-medium text-right">Total Tokens</th>
+                    <th className="px-4 py-3 font-medium text-right">Messages</th>
+                    <th className="px-4 py-3 font-medium text-right">Cost</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {usageData.usage.slice(0, 50).map((entry, idx) => (
+                  {usageData.usage
+                    .filter(e => e.usage && (e.usage.totalTokens || 0) > 0)
+                    .sort((a, b) => (b.usage?.totalCost || 0) - (a.usage?.totalCost || 0))
+                    .map((entry, idx) => (
                     <tr
-                      key={`${entry.key || ""}-${entry.date || idx}`}
+                      key={entry.key || idx}
                       className="border-b border-[color:var(--border)] last:border-b-0 hover:bg-[color:var(--surface-strong)] transition"
                     >
-                      <td className="px-4 py-3 text-strong text-xs font-mono">
-                        {entry.label || entry.key || "—"}
+                      <td className="px-4 py-3 font-medium text-strong">
+                        {entry.label || entry.agentId || "—"}
                       </td>
-                      <td className="px-4 py-3 text-muted">{entry.date || "—"}</td>
-                      <td className="px-4 py-3 text-right text-muted">
-                        {entry.inputTokens ? formatTokens(entry.inputTokens) : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-right text-muted">
-                        {entry.outputTokens ? formatTokens(entry.outputTokens) : "—"}
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center rounded-md bg-[color:var(--surface-strong)] px-2 py-0.5 text-xs">
+                          {entry.modelProvider ? `${entry.modelProvider}/` : ""}{entry.model || "default"}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-right text-muted">
-                        {entry.cacheReadTokens ? formatTokens(entry.cacheReadTokens) : "—"}
+                        {formatTokens(entry.usage?.input || 0)}
                       </td>
                       <td className="px-4 py-3 text-right text-muted">
-                        {entry.runs || "—"}
+                        {formatTokens(entry.usage?.output || 0)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-muted">
+                        {formatTokens(entry.usage?.cacheRead || 0)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium text-strong">
+                        {formatTokens(entry.usage?.totalTokens || 0)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-muted">
+                        {entry.usage?.messageCounts?.assistant || 0}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium text-strong">
+                        {entry.usage?.totalCost ? `$${entry.usage.totalCost.toFixed(2)}` : "—"}
                       </td>
                     </tr>
                   ))}
