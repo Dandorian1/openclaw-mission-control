@@ -23,7 +23,7 @@ RUNTIME_ANNOTATION_TYPES = (datetime, UUID, NonEmptyStr, TagRef)
 class TaskBase(SQLModel):
     """Shared task fields used by task create/read payloads."""
 
-    title: str
+    title: NonEmptyStr
     description: str | None = None
     status: TaskStatus = "inbox"
     priority: str = "medium"
@@ -43,7 +43,7 @@ class TaskCreate(TaskBase):
 class TaskUpdate(SQLModel):
     """Payload for partial task updates."""
 
-    title: str | None = None
+    title: NonEmptyStr | None = None
     description: str | None = None
     status: TaskStatus | None = None
     priority: str | None = None
