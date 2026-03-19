@@ -401,9 +401,28 @@ export default function UsagePage() {
                           ) : null}
                         </div>
                         {error ? (
-                          <div className="mt-2 flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 dark:bg-amber-950">
-                            <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                            <p className="text-xs text-amber-700 dark:text-amber-300">{error}</p>
+                          <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 dark:bg-amber-950">
+                            <div className="flex items-center gap-2">
+                              <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                              <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                                {error.includes("user:profile")
+                                  ? "Usage data unavailable — token missing required scope"
+                                  : error.includes("429") || error.includes("Rate limited")
+                                  ? "Provider is rate limited — usage data temporarily unavailable"
+                                  : error}
+                              </p>
+                            </div>
+                            {error.includes("user:profile") ? (
+                              <div className="mt-2 text-xs text-amber-600 dark:text-amber-400 space-y-1">
+                                <p>The current auth token doesn&apos;t include the <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">user:profile</code> scope needed for usage data.</p>
+                                <p className="font-medium">To fix, set one of these in your gateway config:</p>
+                                <ul className="list-disc pl-4 space-y-0.5">
+                                  <li><code className="rounded bg-amber-100 px-1 dark:bg-amber-900">CLAUDE_WEB_SESSION_KEY</code> — copy the sessionKey cookie from claude.ai</li>
+                                  <li><code className="rounded bg-amber-100 px-1 dark:bg-amber-900">CLAUDE_WEB_COOKIE</code> — full cookie string from claude.ai</li>
+                                </ul>
+                                <p className="text-amber-500 dark:text-amber-500">Or run <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">claude login</code> (full OAuth, not setup-token) for broader scopes.</p>
+                              </div>
+                            ) : null}
                           </div>
                         ) : windows && Array.isArray(windows) && windows.length > 0 ? (
                           <div className="mt-3 space-y-3">
