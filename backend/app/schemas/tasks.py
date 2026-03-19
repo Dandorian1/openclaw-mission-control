@@ -14,6 +14,7 @@ from app.schemas.tags import TagRef
 from app.schemas.task_custom_fields import TaskCustomFieldValues
 
 TaskStatus = Literal["inbox", "in_progress", "review", "done"]
+TaskPriority = Literal["critical", "high", "medium", "low"]
 STATUS_REQUIRED_ERROR = "status is required"
 # Keep these symbols as runtime globals so Pydantic can resolve
 # deferred annotations reliably.
@@ -26,7 +27,7 @@ class TaskBase(SQLModel):
     title: NonEmptyStr
     description: str | None = None
     status: TaskStatus = "inbox"
-    priority: str = "medium"
+    priority: TaskPriority = "medium"
     due_at: datetime | None = None
     assigned_agent_id: UUID | None = None
     depends_on_task_ids: list[UUID] = Field(default_factory=list)
@@ -46,7 +47,7 @@ class TaskUpdate(SQLModel):
     title: NonEmptyStr | None = None
     description: str | None = None
     status: TaskStatus | None = None
-    priority: str | None = None
+    priority: TaskPriority | None = None
     due_at: datetime | None = None
     assigned_agent_id: UUID | None = None
     depends_on_task_ids: list[UUID] | None = None
