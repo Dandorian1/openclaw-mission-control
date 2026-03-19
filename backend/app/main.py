@@ -451,9 +451,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         logger.info("app.lifecycle.stopped")
 
 
-_docs_url: str | None = None if settings.is_production else "/docs"
-_redoc_url: str | None = None if settings.is_production else "/redoc"
-_openapi_url: str | None = None if settings.is_production else "/openapi.json"
+_docs_url: str | None = "/docs"
+_redoc_url: str | None = "/redoc"
+_openapi_url: str | None = "/openapi.json"
 
 app = MissionControlFastAPI(
     title="Mission Control API",
