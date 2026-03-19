@@ -271,8 +271,15 @@ async def update_gateway_model_config(
             # Nothing to update — re-read and return current
             return await _read_gateway_model_config(config)
 
+        # Get current config to extract baseHash — required by config.patch
+        cfg = await openclaw_call("config.get", config=config)
+        base_hash = cfg.get("hash") if isinstance(cfg, dict) else None
+
         patch = {"agents": {"defaults": {"model": model_patch}}}
-        await openclaw_call("config.patch", {"raw": json.dumps(patch)}, config=config)
+        params: dict = {"raw": json.dumps(patch)}
+        if base_hash:
+            params["baseHash"] = base_hash
+        await openclaw_call("config.patch", params, config=config)
         return await _read_gateway_model_config(config)
     except OpenClawGatewayError as exc:
         return GatewayModelConfig(error=str(exc))
