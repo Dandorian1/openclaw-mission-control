@@ -593,4 +593,11 @@ async def ensure_session(
         params["label"] = label
     if model:
         params["model"] = model
+    logger.info(
+        "ensure_session key=%s label=%s model=%s params=%s",
+        session_key,
+        label,
+        model,
+        params,
+    )
     return await openclaw_call("sessions.patch", params, config=config)

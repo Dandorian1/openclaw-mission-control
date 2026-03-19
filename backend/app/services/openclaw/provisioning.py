@@ -506,6 +506,7 @@ class GatewayAgentRegistration:
     name: str
     workspace_path: str
     heartbeat: dict[str, Any]
+    model: str | None = None
 
 
 class GatewayControlPlane(ABC):
@@ -617,13 +618,16 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
         _update_delay = 0.5
         for _attempt in range(_update_retries):
             try:
+                update_params: dict[str, Any] = {
+                    "agentId": registration.agent_id,
+                    "name": registration.name,
+                    "workspace": registration.workspace_path,
+                }
+                if registration.model:
+                    update_params["model"] = registration.model
                 await openclaw_call(
                     "agents.update",
-                    {
-                        "agentId": registration.agent_id,
-                        "name": registration.name,
-                        "workspace": registration.workspace_path,
-                    },
+                    update_params,
                     config=self._config,
                 )
                 break
@@ -929,6 +933,7 @@ class BaseAgentLifecycleManager(ABC):
                 name=agent.name,
                 workspace_path=workspace_path,
                 heartbeat=heartbeat,
+                model=agent.preferred_model or None,
             ),
         )
 
