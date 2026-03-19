@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+import json as _json
+import time
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, Query
@@ -245,6 +249,51 @@ async def gateway_usage(
         return GatewayUsageResponse(error=str(exc))
 
 
+# --- Provider usage cache (refreshes every 15 minutes) ---
+_PROVIDER_USAGE_CACHE_PATH = Path("/tmp/openclaw-provider-usage-cache.json")
+_PROVIDER_USAGE_CACHE_TTL = 15 * 60  # 15 minutes
+_provider_usage_refresh_lock = asyncio.Lock()
+
+
+def _read_provider_cache() -> tuple[dict | None, float]:
+    """Read cached provider usage data. Returns (data, age_seconds)."""
+    try:
+        if _PROVIDER_USAGE_CACHE_PATH.exists():
+            raw = _json.loads(_PROVIDER_USAGE_CACHE_PATH.read_text())
+            cached_at = raw.get("_cached_at", 0)
+            age = time.time() - cached_at
+            return raw, age
+    except Exception:
+        pass
+    return None, float("inf")
+
+
+def _write_provider_cache(data: dict) -> None:
+    """Write provider usage data to cache."""
+    try:
+        data["_cached_at"] = time.time()
+        _PROVIDER_USAGE_CACHE_PATH.write_text(_json.dumps(data))
+    except Exception:
+        pass
+
+
+async def _refresh_provider_usage_cache(board_id: str | None, user: object, db_session: object) -> dict | None:
+    """Fetch fresh provider usage data from gateway and cache it."""
+    service = GatewaySessionService(db_session)  # type: ignore[arg-type]
+    try:
+        _board, config, _main = await service.require_gateway(
+            board_id,
+            user=user,
+        )
+        raw = await usage_status(config=config)
+        if isinstance(raw, dict):
+            _write_provider_cache(raw)
+            return raw
+    except (OpenClawGatewayError, Exception):
+        pass
+    return None
+
+
 @router.get("/usage/providers", response_model=GatewayProviderUsageResponse)
 async def gateway_provider_usage(
     board_id: str | None = BOARD_ID_QUERY,
@@ -254,10 +303,31 @@ async def gateway_provider_usage(
 ) -> GatewayProviderUsageResponse:
     """Return provider usage/quota status from the gateway.
 
-    Calls the ``usage.status`` RPC to get quota windows for OAuth and
-    API-key backed providers (e.g. Claude weekly limits, ChatGPT Plus
-    usage windows).
+    Uses a 15-minute cache to avoid rate-limiting by providers.
+    Calls ``usage.status`` RPC only when cache is stale.
     """
+    # Check cache first
+    cached, age = _read_provider_cache()
+    if cached and age < _PROVIDER_USAGE_CACHE_TTL:
+        providers = cached.get("providers") or []
+        return GatewayProviderUsageResponse(providers=providers, raw=cached)
+
+    # Cache is stale — refresh (with lock to avoid concurrent fetches)
+    if _provider_usage_refresh_lock.locked():
+        # Another request is already refreshing — return stale cache if available
+        if cached:
+            providers = cached.get("providers") or []
+            return GatewayProviderUsageResponse(providers=providers, raw=cached)
+    else:
+        async with _provider_usage_refresh_lock:
+            raw = await _refresh_provider_usage_cache(board_id, auth.user, session)
+            if raw:
+                providers = raw.get("providers") or raw.get("entries") or raw.get("items") or []
+                if not isinstance(providers, list):
+                    providers = [raw]
+                return GatewayProviderUsageResponse(providers=providers, raw=raw)
+
+    # No cache and refresh failed — try live call as fallback
     service = GatewaySessionService(session)
     try:
         _board, config, _main = await service.require_gateway(
@@ -266,18 +336,20 @@ async def gateway_provider_usage(
         )
         raw = await usage_status(config=config)
         if isinstance(raw, dict):
+            _write_provider_cache(raw)
             providers = raw.get("providers") or raw.get("entries") or raw.get("items") or []
             if not isinstance(providers, list):
                 providers = [raw]
-            return GatewayProviderUsageResponse(
-                providers=providers,
-                raw=raw,
-            )
+            return GatewayProviderUsageResponse(providers=providers, raw=raw)
         elif isinstance(raw, list):
             return GatewayProviderUsageResponse(providers=raw)
         else:
             return GatewayProviderUsageResponse(raw={"data": raw} if raw else None)
     except OpenClawGatewayError as exc:
+        # Return stale cache with error note if available
+        if cached:
+            providers = cached.get("providers") or []
+            return GatewayProviderUsageResponse(providers=providers, raw=cached)
         return GatewayProviderUsageResponse(error=str(exc))
 
 
