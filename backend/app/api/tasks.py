@@ -2168,6 +2168,8 @@ async def _lead_apply_status(
 
     # Leads may move inbox → in_progress (delegation or self-work kickoff).
     if update.task.status == "inbox" and target_status == "in_progress":
+        if update.task.assigned_agent_id == lead_agent.id:
+            update.task.in_progress_at = utcnow()
         update.task.status = target_status
         return
 

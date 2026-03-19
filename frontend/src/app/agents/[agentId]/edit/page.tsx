@@ -93,6 +93,7 @@ export default function EditAgentPage() {
   const [isGatewayMain, setIsGatewayMain] = useState<boolean | undefined>(
     undefined,
   );
+  const [isBoardLead, setIsBoardLead] = useState<boolean | undefined>(undefined);
   const [heartbeatEvery, setHeartbeatEvery] = useState<string | undefined>(
     undefined,
   );
@@ -246,6 +247,7 @@ export default function EditAgentPage() {
   const resolvedName = name ?? loadedAgent?.name ?? "";
   const resolvedIsGatewayMain =
     isGatewayMain ?? Boolean(loadedAgent?.is_gateway_main);
+  const resolvedIsBoardLead = isBoardLead ?? Boolean(loadedAgent?.is_board_lead);
   const resolvedHeartbeatEvery = heartbeatEvery ?? loadedHeartbeat.every;
   const resolvedModelEffortTier =
     modelEffortTier ?? (loadedAgent?.model_effort_tier as string | undefined) ?? "";
@@ -258,6 +260,12 @@ export default function EditAgentPage() {
     return boardId ?? loadedAgent?.board_id ?? boards[0]?.id ?? "";
   }, [boardId, boards, loadedAgent?.board_id, resolvedIsGatewayMain]);
 
+  useEffect(() => {
+    if (resolvedIsGatewayMain) {
+      setIsBoardLead(false);
+    }
+  }, [resolvedIsGatewayMain]);
+
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!isSignedIn || !agentId || !loadedAgent) return;
@@ -268,6 +276,10 @@ export default function EditAgentPage() {
     }
     if (!resolvedIsGatewayMain && !resolvedBoardId) {
       setError("Select a board or mark this agent as the gateway main.");
+      return;
+    }
+    if (resolvedIsGatewayMain && resolvedIsBoardLead) {
+      setError("Gateway main agents cannot also be board leads.");
       return;
     }
     if (
@@ -304,6 +316,7 @@ export default function EditAgentPage() {
         loadedAgent.identity_profile,
         resolvedIdentityProfile,
       ) as unknown as Record<string, unknown> | null,
+      is_board_lead: resolvedIsBoardLead,
       model_effort_tier: resolvedModelEffortTier.trim() || null,
       preferred_model: resolvedPreferredModel.trim() || null,
     };
@@ -504,7 +517,24 @@ export default function EditAgentPage() {
             </div>
           </div>
 
-          <div className="mt-6 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-4">
+          <div className="mt-6 space-y-3 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-4">
+            <label className="flex items-start gap-3 text-sm text-strong">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-200"
+                checked={resolvedIsBoardLead}
+                onChange={(event) => setIsBoardLead(event.target.checked)}
+                disabled={isLoading || resolvedIsGatewayMain}
+              />
+              <span>
+                <span className="block font-medium text-strong">
+                  Board lead agent
+                </span>
+                <span className="block text-xs text-muted">
+                  Promotes this board-scoped agent to the board lead role.
+                </span>
+              </span>
+            </label>
             <label className="flex items-start gap-3 text-sm text-strong">
               <input
                 type="checkbox"

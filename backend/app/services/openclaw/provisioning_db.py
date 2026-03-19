@@ -1181,6 +1181,7 @@ class AgentLifecycleService(OpenClawDBService):
         self,
         *,
         ctx: OrganizationContext,
+        agent: Agent,
         updates: dict[str, Any],
         make_main: bool | None,
     ) -> None:
@@ -1204,6 +1205,34 @@ class AgentLifecycleService(OpenClawDBService):
                 write=True,
             )
             OpenClawAuthorizationPolicy.require_board_write_access(allowed=allowed)
+        if "is_board_lead" in updates:
+            requested_lead = bool(updates["is_board_lead"])
+            target_board_id = updates.get("board_id", agent.board_id)
+            if requested_lead:
+                if make_main:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                        detail="Gateway main agents cannot also be board leads",
+                    )
+                if target_board_id is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                        detail="board_id is required when promoting an agent to board lead",
+                    )
+                existing_lead = (
+                    await self.session.exec(
+                        select(Agent)
+                        .where(col(Agent.board_id) == target_board_id)
+                        .where(col(Agent.is_board_lead).is_(True))
+                        .where(col(Agent.id) != agent.id)
+                        .limit(1)
+                    )
+                ).first()
+                if existing_lead is not None:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="This board already has a lead agent",
+                    )
 
     async def apply_agent_update_mutations(
         self,
@@ -1614,6 +1643,7 @@ class AgentLifecycleService(OpenClawDBService):
         make_main = updates.pop("is_gateway_main", None)
         await self.validate_agent_update_inputs(
             ctx=options.context,
+            agent=agent,
             updates=updates,
             make_main=make_main,
         )

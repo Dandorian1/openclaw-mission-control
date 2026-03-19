@@ -19,6 +19,8 @@ export interface AgentUpdate {
   identity_profile?: AgentUpdateIdentityProfile;
   /** Optional replacement identity template. */
   identity_template?: string | null;
+  /** Whether this board-scoped agent should act as the board lead. */
+  is_board_lead?: boolean | null;
   /** Whether this agent is treated as the board gateway main. */
   is_gateway_main?: boolean | null;
   /** Optional replacement display name. */

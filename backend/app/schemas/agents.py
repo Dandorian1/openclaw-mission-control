@@ -245,6 +245,10 @@ class AgentUpdate(SQLModel):
         default=None,
         description="Whether this agent is treated as the board gateway main.",
     )
+    is_board_lead: bool | None = Field(
+        default=None,
+        description="Whether this board-scoped agent should act as the board lead.",
+    )
     name: NonEmptyStr | None = Field(
         default=None,
         description="Optional replacement display name.",
