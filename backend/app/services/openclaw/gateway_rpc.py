@@ -95,6 +95,7 @@ GATEWAY_METHODS = [
     "sessions.reset",
     "sessions.delete",
     "sessions.compact",
+    "sessions.usage",
     "last-heartbeat",
     "set-heartbeats",
     "wake",
@@ -601,3 +602,33 @@ async def ensure_session(
         params,
     )
     return await openclaw_call("sessions.patch", params, config=config)
+
+
+async def sessions_usage(
+    *,
+    config: GatewayConfig,
+    key: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    mode: str | None = None,
+    utc_offset: str | None = None,
+    limit: int | None = None,
+    include_context_weight: bool | None = None,
+) -> object:
+    """Fetch token usage data from the gateway."""
+    params: dict[str, Any] = {}
+    if key:
+        params["key"] = key
+    if start_date:
+        params["startDate"] = start_date
+    if end_date:
+        params["endDate"] = end_date
+    if mode:
+        params["mode"] = mode
+    if utc_offset:
+        params["utcOffset"] = utc_offset
+    if limit is not None:
+        params["limit"] = limit
+    if include_context_weight is not None:
+        params["includeContextWeight"] = include_context_weight
+    return await openclaw_call("sessions.usage", params, config=config)

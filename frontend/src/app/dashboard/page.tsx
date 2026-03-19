@@ -1092,7 +1092,7 @@ export default function DashboardPage() {
                 </div>
               ) : hasPendingApprovals ? (
                 <div className="space-y-2">
-                  <div className="divide-y divide-[color:var(--border)] rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] dark:divide-slate-800">
+                  <div className="divide-y divide-[color:var(--border)] rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)]">
                     {pendingApprovalItems.map((item) => (
                       <Link
                         key={item.approval_id}

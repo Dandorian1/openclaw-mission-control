@@ -247,6 +247,11 @@ async def test_openclaw_call_once_does_not_pass_ssl_none_for_wss(
 async def test_openclaw_call_once_passes_ssl_context_for_insecure_wss(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from app.core.config import Settings
+
+    # Ensure production guard does not fire in this test (allow_insecure_tls is dev-only)
+    monkeypatch.setattr(gateway_rpc, "settings", Settings.model_construct(environment="dev"))
+
     captured: dict[str, object] = {}
 
     def _fake_connect(url: str, **kwargs: object) -> _FakeConnectContext:

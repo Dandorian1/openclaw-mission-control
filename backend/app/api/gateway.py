@@ -23,6 +23,7 @@ from app.schemas.gateway_api import (
     GatewaySessionResponse,
     GatewaySessionsResponse,
     GatewaysStatusResponse,
+    GatewayUsageResponse,
 )
 from app.services.openclaw.gateway_resolver import gateway_client_config
 from app.services.openclaw.gateway_rpc import (
@@ -31,6 +32,7 @@ from app.services.openclaw.gateway_rpc import (
     PROTOCOL_VERSION,
     OpenClawGatewayError,
     openclaw_call,
+    sessions_usage,
 )
 from app.services.openclaw.session_service import GatewaySessionService
 from app.services.organizations import OrganizationContext
@@ -190,6 +192,53 @@ async def list_gateway_models(
         return GatewayModelsResponse(models=[], error=exc.detail if isinstance(exc.detail, str) else str(exc.detail))
     except OpenClawGatewayError as exc:
         return GatewayModelsResponse(models=[], error=str(exc))
+
+
+@router.get("/usage", response_model=GatewayUsageResponse)
+async def gateway_usage(
+    board_id: str | None = BOARD_ID_QUERY,
+    session_key: str | None = Query(default=None, alias="session_key"),
+    start_date: str | None = Query(default=None, alias="start_date"),
+    end_date: str | None = Query(default=None, alias="end_date"),
+    session: AsyncSession = SESSION_DEP,
+    auth: AuthContext = AUTH_DEP,
+    _ctx: OrganizationContext = ORG_ADMIN_DEP,
+) -> GatewayUsageResponse:
+    """Return token usage data from the gateway.
+
+    Calls the ``sessions.usage`` RPC on the gateway connected to the given board.
+    Returns per-session usage data with optional date filtering.
+    """
+    service = GatewaySessionService(session)
+    try:
+        _board, config, _main = await service.require_gateway(
+            board_id,
+            user=auth.user,
+        )
+        raw = await sessions_usage(
+            config=config,
+            key=session_key,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if isinstance(raw, dict):
+            usage_list = raw.get("usage") or raw.get("entries") or raw.get("sessions") or []
+            if not isinstance(usage_list, list):
+                usage_list = [raw]
+            summary = {
+                k: v
+                for k, v in raw.items()
+                if k not in ("usage", "entries", "sessions")
+            } or None
+        elif isinstance(raw, list):
+            usage_list = raw
+            summary = None
+        else:
+            usage_list = []
+            summary = None
+        return GatewayUsageResponse(usage=usage_list, summary=summary)
+    except OpenClawGatewayError as exc:
+        return GatewayUsageResponse(error=str(exc))
 
 
 @router.get("/{gateway_id}/config/models", response_model=GatewayModelConfig)

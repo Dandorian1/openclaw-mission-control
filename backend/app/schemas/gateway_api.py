@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from pydantic import field_validator
-from sqlmodel import SQLModel
+from sqlmodel import Field, SQLModel
 
 from app.schemas.common import NonEmptyStr
 
@@ -113,6 +113,14 @@ class GatewayModelConfig(SQLModel):
 
     primary: str | None = None
     fallbacks: list[str] = []
+    error: str | None = None
+
+
+class GatewayUsageResponse(SQLModel):
+    """Gateway usage data response payload."""
+
+    usage: list[dict] = Field(default_factory=list)
+    summary: dict | None = None
     error: str | None = None
 
 
