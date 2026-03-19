@@ -15,6 +15,7 @@ import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { Input } from "@/components/ui/input";
 
 import { ApiError, customFetch } from "@/api/mutator";
+import SearchableSelect from "@/components/ui/searchable-select";
 import {
   type listBoardsApiV1BoardsGetResponse,
   useListBoardsApiV1BoardsGet,
@@ -172,13 +173,13 @@ export default function GatewayDetailPage() {
     boardIdForModels ? { board_id: boardIdForModels } : undefined,
     { query: { enabled: Boolean(isSignedIn && isAdmin && gateway && isConnected && boardIdForModels), retry: false } },
   );
-  const availableModels = useMemo(() => {
+  const availableModelOptions = useMemo(() => {
     const raw = gatewayModelsQuery.data?.status === 200
       ? (gatewayModelsQuery.data.data?.models ?? [])
       : [];
     return raw
       .map((m) => {
-        if (typeof m === "string") return m;
+        if (typeof m === "string") return { value: m, label: m };
         if (m && typeof m === "object") {
           const obj = m as Record<string, unknown>;
           const slug =
@@ -190,13 +191,18 @@ export default function GatewayDetailPage() {
           // models.list returns bare slugs (e.g. "claude-sonnet-4-6") while
           // config/models returns provider-prefixed IDs ("anthropic/claude-sonnet-4-6").
           // Without normalization the dropdown value never matches the saved value.
-          return slug && provider && !slug.includes("/")
+          const value = slug && provider && !slug.includes("/")
             ? `${provider}/${slug}`
             : slug;
+          const label =
+            typeof obj.name === "string" ? obj.name
+            : typeof obj.alias === "string" ? obj.alias
+            : value;
+          if (value) return { value, label: label ?? value };
         }
         return null;
       })
-      .filter((s): s is string => !!s);
+      .filter(Boolean) as { value: string; label: string }[];
   }, [gatewayModelsQuery.data]);
 
   // Fetch current model config from gateway when connected
@@ -400,18 +406,25 @@ export default function GatewayDetailPage() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-strong">Default model</label>
-                    {availableModels.length > 0 ? (
-                      <select
-                        value={primaryModel}
-                        onChange={(e) => setPrimaryModel(e.target.value)}
+                    {availableModelOptions.length > 0 ? (
+                      <SearchableSelect
+                        ariaLabel="Select default model"
+                        value={primaryModel || "__default__"}
+                        onValueChange={(value) =>
+                          setPrimaryModel(value === "__default__" ? "" : value)
+                        }
+                        options={[
+                          { value: "__default__", label: "Gateway default" },
+                          ...availableModelOptions,
+                        ]}
+                        placeholder="Gateway default"
+                        searchPlaceholder="Search models..."
+                        emptyMessage="No matching models."
                         disabled={modelSaving}
-                        className="flex h-11 w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 text-sm text-strong shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]"
-                      >
-                        <option value="">Gateway default</option>
-                        {availableModels.map((m) => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
+                        triggerClassName="w-full h-11 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm font-medium text-strong shadow-sm"
+                        contentClassName="rounded-xl border border-[color:var(--border)] shadow-lg"
+                        itemClassName="px-4 py-3 text-sm text-strong font-mono data-[selected=true]:bg-[color:var(--surface-muted)]"
+                      />
                     ) : (
                       <Input
                         value={primaryModel}
