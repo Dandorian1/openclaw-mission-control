@@ -28,6 +28,7 @@ import {
   useGatewaysStatusApiV1GatewaysStatusGet,
 } from "@/api/generated/gateways/gateways";
 import { DashboardShell } from "@/components/templates/DashboardShell";
+import { DashboardSidebar } from "@/components/organisms/DashboardSidebar";
 import { SignedOutPanel } from "@/components/auth/SignedOutPanel";
 import { cn } from "@/lib/utils";
 
@@ -340,6 +341,8 @@ export default function UsagePage() {
 
   return (
     <DashboardShell>
+      <DashboardSidebar />
+      <main className="flex-1 overflow-y-auto bg-app">
       <div className="mx-auto max-w-6xl space-y-6 p-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -812,6 +815,7 @@ export default function UsagePage() {
           </div>
         )}
       </div>
+      </main>
     </DashboardShell>
   );
 }
