@@ -111,6 +111,9 @@ def _heartbeat_config(agent: Agent) -> dict[str, Any]:
     merged = DEFAULT_HEARTBEAT_CONFIG.copy()
     if isinstance(agent.heartbeat_config, dict):
         merged.update(agent.heartbeat_config)
+    # Inject heartbeat_model as the gateway's heartbeat 'model' field
+    if getattr(agent, "heartbeat_model", None):
+        merged["model"] = agent.heartbeat_model
     return merged
 
 

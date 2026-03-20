@@ -137,6 +137,15 @@ class AgentBase(SQLModel):
         ),
         examples=["anthropic/claude-opus-4-6", "openai/gpt-4o", "anthropic/claude-sonnet-4-6"],
     )
+    heartbeat_model: str | None = Field(
+        default=None,
+        description=(
+            "Model for heartbeat check-ins in 'provider/model' format "
+            "(e.g. 'anthropic/claude-sonnet-4-6'). When set, heartbeat runs use this "
+            "cheaper model instead of the agent's preferred model, reducing token costs."
+        ),
+        examples=["anthropic/claude-sonnet-4-6", "anthropic/claude-haiku-3-5"],
+    )
 
     @field_validator("identity_template", "soul_template", mode="before")
     @classmethod
@@ -295,6 +304,15 @@ class AgentUpdate(SQLModel):
         ),
         examples=["anthropic/claude-opus-4-6", "openai/gpt-4o"],
     )
+    heartbeat_model: str | None = Field(
+        default=None,
+        description=(
+            "Optional model for heartbeat runs in 'provider/model' format. "
+            "Use a cheaper model for heartbeat check-ins to reduce token costs. "
+            "Set to null to use the agent's preferred model."
+        ),
+        examples=["anthropic/claude-sonnet-4-6", "anthropic/claude-haiku-3-5"],
+    )
 
     @field_validator("identity_template", "soul_template", mode="before")
     @classmethod
@@ -324,10 +342,10 @@ class AgentUpdate(SQLModel):
         msg = "model_effort_tier must be a string"
         raise ValueError(msg)
 
-    @field_validator("preferred_model", mode="before")
+    @field_validator("preferred_model", "heartbeat_model", mode="before")
     @classmethod
     def normalize_preferred_model(cls, value: object) -> str | None:
-        """Normalize and validate preferred_model.
+        """Normalize and validate preferred_model or heartbeat_model.
 
         - Blank/whitespace -> None (cleared)
         - Non-string -> None (ignored)
@@ -344,12 +362,12 @@ class AgentUpdate(SQLModel):
             return None
         if len(stripped) >= _PREFERRED_MODEL_MAX_LEN:
             msg = (
-                f"preferred_model must not exceed {_PREFERRED_MODEL_MAX_LEN} characters"
+                f"model must not exceed {_PREFERRED_MODEL_MAX_LEN} characters"
             )
             raise ValueError(msg)
         if ".." in stripped or not _PREFERRED_MODEL_RE.match(stripped):
             msg = (
-                "preferred_model must be in 'provider/model' format "
+                "model must be in 'provider/model' format "
                 "(e.g. 'anthropic/claude-opus-4-6'). "
                 "Path traversal sequences are not allowed."
             )

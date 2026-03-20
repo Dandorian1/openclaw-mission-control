@@ -63,5 +63,14 @@ class Agent(QueryModel, table=True):
         ),
         index=False,
     )
+    heartbeat_model: str | None = Field(
+        default=None,
+        description=(
+            "Model for heartbeat runs in 'provider/model' format "
+            "(e.g. 'anthropic/claude-sonnet-4-6'). When set, heartbeat check-ins "
+            "use this cheaper model instead of the agent's preferred model."
+        ),
+        index=False,
+    )
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)

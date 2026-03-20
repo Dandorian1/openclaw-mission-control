@@ -103,6 +103,9 @@ export default function EditAgentPage() {
   const [preferredModel, setPreferredModel] = useState<string | undefined>(
     undefined,
   );
+  const [heartbeatModel, setHeartbeatModel] = useState<string | undefined>(
+    undefined,
+  );
   const [identityProfile, setIdentityProfile] = useState<
     IdentityProfile | undefined
   >(undefined);
@@ -253,6 +256,8 @@ export default function EditAgentPage() {
     modelEffortTier ?? (loadedAgent?.model_effort_tier as string | undefined) ?? "";
   const resolvedPreferredModel =
     preferredModel ?? (loadedAgent?.preferred_model as string | undefined) ?? "";
+  const resolvedHeartbeatModel =
+    heartbeatModel ?? ((loadedAgent as unknown as Record<string, unknown>)?.heartbeat_model as string | undefined) ?? "";
   const resolvedIdentityProfile = identityProfile ?? loadedIdentityProfile;
 
   const resolvedBoardId = useMemo(() => {
@@ -319,7 +324,8 @@ export default function EditAgentPage() {
       is_board_lead: resolvedIsBoardLead,
       model_effort_tier: resolvedModelEffortTier.trim() || null,
       preferred_model: resolvedPreferredModel.trim() || null,
-    };
+      heartbeat_model: resolvedHeartbeatModel.trim() || null,
+    } as AgentUpdate;
     if (!resolvedIsGatewayMain) {
       payload.board_id = resolvedBoardId || null;
     } else if (resolvedBoardId) {
@@ -583,7 +589,7 @@ export default function EditAgentPage() {
           <p className="text-xs font-semibold uppercase tracking-wider text-muted">
             Schedule & notifications
           </p>
-          <div className="mt-4">
+          <div className="mt-4 grid gap-6 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-medium text-strong">
                 Interval
@@ -596,6 +602,44 @@ export default function EditAgentPage() {
               />
               <p className="text-xs text-muted">
                 Set how often this agent runs HEARTBEAT.md.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-strong">
+                Heartbeat model
+              </label>
+              {gatewayModelOptions.length > 0 ? (
+                <SearchableSelect
+                  ariaLabel="Select heartbeat model"
+                  value={resolvedHeartbeatModel || "__agent_model__"}
+                  onValueChange={(value) =>
+                    setHeartbeatModel(value === "__agent_model__" ? "" : value)
+                  }
+                  options={[
+                    { value: "__agent_model__", label: "Use agent model" },
+                    ...gatewayModelOptions,
+                  ]}
+                  placeholder="Use agent model"
+                  searchPlaceholder="Search models..."
+                  emptyMessage="No matching models."
+                  disabled={isLoading}
+                  triggerClassName="w-full h-11 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm font-medium text-strong shadow-sm"
+                  contentClassName="rounded-xl border border-[color:var(--border)] shadow-lg"
+                  itemClassName="px-4 py-3 text-sm text-strong font-mono data-[selected=true]:bg-[color:var(--surface-muted)]"
+                />
+              ) : (
+                <Input
+                  value={resolvedHeartbeatModel}
+                  onChange={(event) => setHeartbeatModel(event.target.value)}
+                  placeholder="e.g. anthropic/claude-sonnet-4-6"
+                  disabled={isLoading}
+                  className="font-mono text-sm"
+                />
+              )}
+              <p className="text-xs text-muted">
+                Use a cheaper model for heartbeat check-ins to save tokens.
+                Leave as &ldquo;Use agent model&rdquo; to use the agent&apos;s
+                main model for heartbeats.
               </p>
             </div>
           </div>
