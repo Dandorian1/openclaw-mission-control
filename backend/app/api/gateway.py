@@ -250,31 +250,27 @@ async def gateway_usage(
 
 
 # --- Provider usage cache (refreshes every 15 minutes) ---
-_PROVIDER_USAGE_CACHE_PATH = Path("/tmp/openclaw-provider-usage-cache.json")
+# In-memory cache eliminates the /tmp world-readable file risk (GHSA 6d25cd10).
 _PROVIDER_USAGE_CACHE_TTL = 15 * 60  # 15 minutes
 _provider_usage_refresh_lock = asyncio.Lock()
+_provider_usage_cache: dict | None = None
+_provider_usage_cached_at: float = 0.0
 
 
 def _read_provider_cache() -> tuple[dict | None, float]:
     """Read cached provider usage data. Returns (data, age_seconds)."""
-    try:
-        if _PROVIDER_USAGE_CACHE_PATH.exists():
-            raw = _json.loads(_PROVIDER_USAGE_CACHE_PATH.read_text())
-            cached_at = raw.get("_cached_at", 0)
-            age = time.time() - cached_at
-            return raw, age
-    except Exception:
-        pass
+    if _provider_usage_cache is not None:
+        age = time.time() - _provider_usage_cached_at
+        return _provider_usage_cache, age
     return None, float("inf")
 
 
 def _write_provider_cache(data: dict) -> None:
-    """Write provider usage data to cache."""
-    try:
-        data["_cached_at"] = time.time()
-        _PROVIDER_USAGE_CACHE_PATH.write_text(_json.dumps(data))
-    except Exception:
-        pass
+    """Write provider usage data to in-memory cache."""
+    global _provider_usage_cache, _provider_usage_cached_at  # noqa: PLW0603
+    data["_cached_at"] = time.time()
+    _provider_usage_cache = data
+    _provider_usage_cached_at = data["_cached_at"]
 
 
 async def _refresh_provider_usage_cache(board_id: str | None, user: object, db_session: object) -> dict | None:
