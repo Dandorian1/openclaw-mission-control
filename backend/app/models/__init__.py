@@ -25,6 +25,7 @@ from app.models.task_custom_fields import (
     TaskCustomFieldDefinition,
     TaskCustomFieldValue,
 )
+from app.models.task_attachments import TaskAttachment
 from app.models.task_dependencies import TaskDependency
 from app.models.task_fingerprints import TaskFingerprint
 from app.models.tasks import Task

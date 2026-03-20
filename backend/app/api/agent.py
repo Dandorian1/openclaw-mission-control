@@ -52,7 +52,7 @@ from app.schemas.gateway_coordination import (
 from app.schemas.health import AgentHealthStatusResponse
 from app.schemas.pagination import DefaultLimitOffsetPage
 from app.schemas.tags import TagRef
-from app.schemas.tasks import TaskCommentCreate, TaskCommentRead, TaskCreate, TaskRead, TaskUpdate
+from app.schemas.tasks import TaskAttachmentRead, TaskCommentCreate, TaskCommentRead, TaskCreate, TaskRead, TaskUpdate
 from app.services.activity_log import record_activity
 from app.services.openclaw.coordination_service import GatewayCoordinationService
 from app.services.openclaw.policies import OpenClawAuthorizationPolicy
@@ -1144,6 +1144,25 @@ async def create_task_comment(
         task=task,
         session=session,
         actor=_actor(agent_ctx),
+    )
+
+
+@router.get(
+    "/boards/{board_id}/tasks/{task_id}/attachments",
+    response_model=list[TaskAttachmentRead],
+    tags=["agent-worker"],
+)
+async def list_task_attachments(
+    task: Task = TASK_DEP,
+    session: AsyncSession = SESSION_DEP,
+    agent_ctx: AgentAuthContext = AGENT_CTX_DEP,
+) -> list:
+    """List attachments for a task."""
+    _guard_task_access(agent_ctx, task)
+    return await tasks_api.list_task_attachments(
+        task=task,
+        session=session,
+        _actor=_actor(agent_ctx),
     )
 
 

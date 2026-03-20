@@ -102,3 +102,15 @@ class TaskCommentRead(SQLModel):
     agent_id: UUID | None
     task_id: UUID | None
     created_at: datetime
+
+
+class TaskAttachmentRead(SQLModel):
+    """Task attachment payload returned from read endpoints."""
+
+    id: UUID
+    task_id: UUID
+    filename: str
+    mimetype: str
+    file_size: int
+    uploaded_at: datetime
+    uploaded_by_user_id: UUID | None = None

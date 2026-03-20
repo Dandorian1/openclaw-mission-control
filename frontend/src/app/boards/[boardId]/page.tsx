@@ -14,7 +14,10 @@ import { SignInButton, SignedIn, SignedOut, useAuth } from "@/auth/clerk";
 import {
   Activity,
   ArrowUpRight,
+  FileUp,
+  ImageIcon,
   MessageSquare,
+  Paperclip,
   Pause,
   Plus,
   Pencil,
@@ -22,6 +25,7 @@ import {
   RefreshCcw,
   Settings,
   ShieldCheck,
+  Trash2,
   X,
 } from "lucide-react";
 
@@ -57,7 +61,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ApiError } from "@/api/mutator";
+import { ApiError, customFetch } from "@/api/mutator";
+import { getLocalAuthToken, isLocalAuthMode } from "@/auth/localAuth";
+import { getApiBaseUrl } from "@/lib/api-base";
 import { streamAgentsApiV1AgentsStreamGet } from "@/api/generated/agents/agents";
 import {
   streamApprovalsApiV1BoardsBoardIdApprovalsStreamGet,
@@ -933,6 +939,22 @@ export default function BoardDetailPage() {
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [isPostingComment, setIsPostingComment] = useState(false);
   const [postCommentError, setPostCommentError] = useState<string | null>(null);
+
+  // Attachments state
+  interface TaskAttachment {
+    id: string;
+    task_id: string;
+    filename: string;
+    mimetype: string;
+    file_size: number;
+    uploaded_at: string;
+    uploaded_by_user_id: string | null;
+  }
+  const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const tasksRef = useRef<Task[]>([]);
   const approvalsRef = useRef<Approval[]>([]);
@@ -2454,6 +2476,75 @@ export default function BoardDetailPage() {
   );
   const isBoardLeadProvisioning = boardLead?.status === "provisioning";
 
+  // --- Attachment helpers ---
+  const loadAttachments = useCallback(
+    async (taskId: string) => {
+      if (!isSignedIn || !boardId) return;
+      try {
+        const res = await customFetch<{ data: TaskAttachment[]; status: number }>(
+          `/api/v1/boards/${boardId}/tasks/${taskId}/attachments`,
+          { method: "GET" },
+        );
+        if (res.status === 200) {
+          setAttachments(res.data);
+        }
+      } catch {
+        // silent — attachments are supplemental
+      }
+    },
+    [boardId, isSignedIn],
+  );
+
+  const handleUploadAttachment = useCallback(
+    async (file: File) => {
+      if (!selectedTask || !boardId) return;
+      setIsUploadingAttachment(true);
+      setAttachmentError(null);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const headers: Record<string, string> = {};
+        if (isLocalAuthMode()) {
+          const token = getLocalAuthToken();
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+        }
+        const baseUrl = getApiBaseUrl();
+        const res = await fetch(`${baseUrl}/api/v1/boards/${boardId}/tasks/${selectedTask.id}/attachments`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: "Upload failed" }));
+          throw new Error(err.detail || "Upload failed");
+        }
+        // Reload attachments
+        await loadAttachments(selectedTask.id);
+      } catch (err) {
+        setAttachmentError(err instanceof Error ? err.message : "Upload failed");
+      } finally {
+        setIsUploadingAttachment(false);
+      }
+    },
+    [boardId, selectedTask, loadAttachments],
+  );
+
+  const handleDeleteAttachment = useCallback(
+    async (attachmentId: string) => {
+      if (!selectedTask || !boardId) return;
+      try {
+        await customFetch(
+          `/api/v1/boards/${boardId}/tasks/${selectedTask.id}/attachments/${attachmentId}`,
+          { method: "DELETE" },
+        );
+        setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+      } catch {
+        // silent
+      }
+    },
+    [boardId, selectedTask],
+  );
+
   const loadComments = useCallback(
     async (taskId: string) => {
       if (!isSignedIn || !boardId) return;
@@ -2507,8 +2598,9 @@ export default function BoardDetailPage() {
       setSelectedTask(fullTask);
       setIsDetailOpen(true);
       void loadComments(task.id);
+      void loadAttachments(task.id);
     },
-    [buildUrlWithTaskAndComment, loadComments, router, searchParams],
+    [buildUrlWithTaskAndComment, loadComments, loadAttachments, router, searchParams],
   );
 
   const selectedTaskDependencies = useMemo<DependencyBannerDependency[]>(() => {
@@ -4029,6 +4121,109 @@ export default function BoardDetailPage() {
                 </div>
               )}
             </div>
+            {/* Attachments */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+                  <Paperclip className="mr-1 inline h-3.5 w-3.5" />
+                  Attachments
+                </p>
+                {canWrite ? (
+                  <button
+                    type="button"
+                    disabled={isUploadingAttachment}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1 rounded-md border border-[color:var(--border)] px-2 py-1 text-xs text-muted transition hover:bg-[color:var(--surface-strong)] disabled:opacity-50"
+                  >
+                    <FileUp className="h-3 w-3" />
+                    {isUploadingAttachment ? "Uploading…" : "Upload"}
+                  </button>
+                ) : null}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/quicktime,video/webm"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      void handleUploadAttachment(file);
+                      e.target.value = "";
+                    }
+                  }}
+                />
+              </div>
+              {attachmentError ? (
+                <p className="text-xs text-rose-600">{attachmentError}</p>
+              ) : null}
+              {attachments.length > 0 ? (
+                <div className="space-y-2">
+                  {attachments.map((att) => {
+                    const isImage = att.mimetype.startsWith("image/");
+                    const isVideo = att.mimetype.startsWith("video/");
+                    const downloadUrl = `/api/v1/boards/${boardId}/tasks/${selectedTask?.id}/attachments/${att.id}/download`;
+                    const sizeLabel = att.file_size >= 1024 * 1024
+                      ? `${(att.file_size / (1024 * 1024)).toFixed(1)} MB`
+                      : `${(att.file_size / 1024).toFixed(1)} KB`;
+                    return (
+                      <div
+                        key={att.id}
+                        className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-2"
+                      >
+                        {isImage ? (
+                          <a href={downloadUrl} target="_blank" rel="noopener noreferrer">
+                            <img
+                              src={downloadUrl}
+                              alt={att.filename}
+                              className="mb-2 max-h-48 w-full rounded-md object-contain"
+                            />
+                          </a>
+                        ) : isVideo ? (
+                          <video
+                            controls
+                            className="mb-2 max-h-48 w-full rounded-md"
+                            preload="metadata"
+                          >
+                            <source src={downloadUrl} type={att.mimetype} />
+                          </video>
+                        ) : null}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {isImage ? (
+                              <ImageIcon className="h-3.5 w-3.5 shrink-0 text-muted" />
+                            ) : (
+                              <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted" />
+                            )}
+                            <a
+                              href={downloadUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="truncate text-xs font-medium text-strong hover:underline"
+                            >
+                              {att.filename}
+                            </a>
+                            <span className="shrink-0 text-xs text-muted">{sizeLabel}</span>
+                          </div>
+                          {canWrite ? (
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteAttachment(att.id)}
+                              className="shrink-0 rounded p-1 text-muted transition hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-950"
+                              title="Delete attachment"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted">No attachments.</p>
+              )}
+            </div>
+
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">
                 Comments

@@ -10,7 +10,10 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import asc, desc, or_
 from sqlmodel import col, func, select
 from sse_starlette.sse import EventSourceResponse
@@ -38,6 +41,7 @@ from app.models.task_custom_fields import (
     TaskCustomFieldDefinition,
     TaskCustomFieldValue,
 )
+from app.models.task_attachments import TaskAttachment
 from app.models.task_dependencies import TaskDependency
 from app.models.task_fingerprints import TaskFingerprint
 from app.models.tasks import Task
@@ -50,7 +54,7 @@ from app.schemas.task_custom_fields import (
     TaskCustomFieldValues,
     validate_custom_field_value,
 )
-from app.schemas.tasks import TaskCommentCreate, TaskCommentRead, TaskCreate, TaskRead, TaskUpdate
+from app.schemas.tasks import TaskAttachmentRead, TaskCommentCreate, TaskCommentRead, TaskCreate, TaskRead, TaskUpdate
 from app.services.activity_log import record_activity
 from app.services.approval_task_links import (
     load_task_ids_by_approval,
@@ -2762,3 +2766,162 @@ async def create_task_comment(
         ),
     )
     return event
+
+
+# ---------------------------------------------------------------------------
+# Task attachments
+# ---------------------------------------------------------------------------
+
+ATTACHMENTS_DIR = Path("/root/openclaw-mission-control/data/attachments")
+ALLOWED_MIMETYPES = {
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "video/mp4",
+    "video/quicktime",
+    "video/webm",
+}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB per file
+MAX_TASK_ATTACHMENTS_SIZE = 10 * 1024 * 1024  # 10 MB per task
+
+
+@router.get("/{task_id}/attachments", response_model=list[TaskAttachmentRead])
+async def list_task_attachments(
+    task: Task = TASK_DEP,
+    session: AsyncSession = SESSION_DEP,
+    _actor: ActorContext = ACTOR_DEP,
+) -> list[TaskAttachment]:
+    """List all attachments for a task."""
+    result = await session.exec(
+        select(TaskAttachment)
+        .where(TaskAttachment.task_id == task.id)
+        .order_by(TaskAttachment.uploaded_at)  # type: ignore[arg-type]
+    )
+    return list(result.all())
+
+
+@router.post("/{task_id}/attachments", response_model=TaskAttachmentRead, status_code=201)
+async def upload_task_attachment(
+    file: UploadFile,
+    task: Task = TASK_DEP,
+    session: AsyncSession = SESSION_DEP,
+    actor: ActorContext = ACTOR_DEP,
+) -> TaskAttachment:
+    """Upload a file attachment to a task."""
+    # Validate MIME type
+    content_type = file.content_type or "application/octet-stream"
+    if content_type not in ALLOWED_MIMETYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File type '{content_type}' not allowed. Allowed: {', '.join(sorted(ALLOWED_MIMETYPES))}",
+        )
+
+    # Read file content and check size
+    content = await file.read()
+    file_size = len(content)
+    if file_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File too large ({file_size} bytes). Maximum: {MAX_FILE_SIZE} bytes (5 MB).",
+        )
+
+    # Check total task attachment size
+    existing = await session.exec(
+        select(TaskAttachment).where(TaskAttachment.task_id == task.id)
+    )
+    existing_size = sum(a.file_size for a in existing.all())
+    if existing_size + file_size > MAX_TASK_ATTACHMENTS_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Total attachments for this task would exceed {MAX_TASK_ATTACHMENTS_SIZE} bytes (10 MB).",
+        )
+
+    # Ensure directory exists and write file
+    task_dir = ATTACHMENTS_DIR / str(task.id)
+    task_dir.mkdir(parents=True, exist_ok=True)
+
+    from uuid import uuid4 as _uuid4
+
+    file_id = _uuid4()
+    safe_filename = file.filename or "attachment"
+    # Sanitize filename
+    safe_filename = safe_filename.replace("/", "_").replace("\\", "_").replace("..", "_")
+    file_path = task_dir / f"{file_id}_{safe_filename}"
+    file_path.write_bytes(content)
+
+    # Determine uploader
+    user_id = None
+    if actor.user:
+        user_id = actor.user.id
+
+    attachment = TaskAttachment(
+        id=file_id,
+        task_id=task.id,
+        filename=safe_filename,
+        mimetype=content_type,
+        file_path=str(file_path),
+        file_size=file_size,
+        uploaded_by_user_id=user_id,
+    )
+    session.add(attachment)
+    await session.commit()
+    await session.refresh(attachment)
+    return attachment
+
+
+@router.get("/{task_id}/attachments/{attachment_id}/download")
+async def download_task_attachment(
+    attachment_id: UUID,
+    task: Task = TASK_DEP,
+    session: AsyncSession = SESSION_DEP,
+    _actor: ActorContext = ACTOR_DEP,
+) -> FileResponse:
+    """Download a task attachment file."""
+    result = await session.exec(
+        select(TaskAttachment).where(
+            TaskAttachment.id == attachment_id,
+            TaskAttachment.task_id == task.id,
+        )
+    )
+    attachment = result.first()
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+    file_path = Path(attachment.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Attachment file missing from disk")
+
+    return FileResponse(
+        path=str(file_path),
+        media_type=attachment.mimetype,
+        filename=attachment.filename,
+    )
+
+
+@router.delete("/{task_id}/attachments/{attachment_id}", response_model=OkResponse)
+async def delete_task_attachment(
+    attachment_id: UUID,
+    task: Task = TASK_DEP,
+    session: AsyncSession = SESSION_DEP,
+    _actor: ActorContext = ACTOR_DEP,
+) -> OkResponse:
+    """Delete a task attachment."""
+    result = await session.exec(
+        select(TaskAttachment).where(
+            TaskAttachment.id == attachment_id,
+            TaskAttachment.task_id == task.id,
+        )
+    )
+    attachment = result.first()
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+    # Delete file from disk
+    file_path = Path(attachment.file_path)
+    if file_path.exists():
+        file_path.unlink()
+
+    await session.delete(attachment)
+    await session.commit()
+    return OkResponse()
