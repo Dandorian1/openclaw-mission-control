@@ -258,6 +258,22 @@ export default function UsagePage() {
     return { totalInput, totalOutput, totalCacheRead, totalRuns, totalCost, totalMessages, totalToolCalls, byModel };
   }, [usageData]);
 
+  // Build per-agent usage lookup from usage data
+  const agentUsageLookup = useMemo(() => {
+    const lookup = new Map<string, { tokens: number; cost: number; messages: number }>();
+    if (!usageData?.usage) return lookup;
+    for (const entry of usageData.usage) {
+      const agentId = entry.agentId;
+      if (!agentId || !entry.usage) continue;
+      const existing = lookup.get(agentId) || { tokens: 0, cost: 0, messages: 0 };
+      existing.tokens += entry.usage.totalTokens || 0;
+      existing.cost += entry.usage.totalCost || 0;
+      existing.messages += entry.usage.messageCounts?.assistant || 0;
+      lookup.set(agentId, existing);
+    }
+    return lookup;
+  }, [usageData]);
+
   // Build per-agent table from sessions
   const agentRows = useMemo(() => {
     const agentMap = new Map<string, {
@@ -266,7 +282,7 @@ export default function UsagePage() {
       status: string;
       lastSeen: string;
       sessionKey: string;
-      statsLine: string;
+      usageSummary: string;
     }>();
 
     for (const agent of agents) {
@@ -281,18 +297,28 @@ export default function UsagePage() {
       // Find matching session
       const session = sessions.find(s => s.key === sessionId);
 
+      // Look up usage from usage data (match by session key patterns)
+      const agentKey = sessionId.replace(/^agent:/, "").replace(/:main$/, "");
+      const usage = agentUsageLookup.get(agentKey) || agentUsageLookup.get(sessionId) || agentUsageLookup.get(id);
+      let usageSummary = "";
+      if (usage && usage.tokens > 0) {
+        const tokenStr = usage.tokens >= 1_000_000 ? `${(usage.tokens / 1_000_000).toFixed(1)}M` :
+                         usage.tokens >= 1_000 ? `${(usage.tokens / 1_000).toFixed(1)}K` : String(usage.tokens);
+        usageSummary = `${tokenStr} tokens · $${usage.cost.toFixed(2)}`;
+      }
+
       agentMap.set(id, {
         name,
         model: session?.model as string || model,
         status: agentStatus,
         lastSeen: lastSeen ? new Date(lastSeen).toLocaleString() : "—",
         sessionKey: sessionId,
-        statsLine: session?.statsLine as string || "",
+        usageSummary,
       });
     }
 
     return Array.from(agentMap.values());
-  }, [agents, sessions]);
+  }, [agents, sessions, agentUsageLookup]);
 
   if (!isSignedIn) {
     return (
@@ -378,11 +404,11 @@ export default function UsagePage() {
               Total Tokens
             </div>
             <p className="mt-2 text-2xl font-bold text-strong">
-              {usageStats ? formatTokens(usageStats.totalInput + usageStats.totalOutput) : "—"}
+              {usageStats ? formatTokens(usageStats.totalInput + usageStats.totalOutput + usageStats.totalCacheRead) : "—"}
             </p>
             {usageStats ? (
               <p className="mt-1 text-xs text-muted">
-                {formatTokens(usageStats.totalInput)} in · {formatTokens(usageStats.totalOutput)} out
+                {formatTokens(usageStats.totalInput)} in · {formatTokens(usageStats.totalOutput)} out{usageStats.totalCacheRead > 0 ? ` · ${formatTokens(usageStats.totalCacheRead)} cached` : ""}
               </p>
             ) : null}
           </div>
@@ -671,7 +697,7 @@ export default function UsagePage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-muted text-xs">
-                        {row.statsLine || "—"}
+                        {row.usageSummary || "—"}
                       </td>
                     </tr>
                   ))
