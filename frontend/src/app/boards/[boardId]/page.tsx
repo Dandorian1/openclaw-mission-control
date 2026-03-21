@@ -954,6 +954,48 @@ export default function BoardDetailPage() {
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [attachmentBlobUrls, setAttachmentBlobUrls] = useState<Record<string, string>>({});
+
+  /** Fetch an attachment via authenticated request and return a blob URL. */
+  const getAuthenticatedBlobUrl = useCallback(
+    async (attachmentId: string, boardId: string, taskId: string): Promise<string | null> => {
+      try {
+        const headers: Record<string, string> = {};
+        if (isLocalAuthMode()) {
+          const token = getLocalAuthToken();
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+        }
+        const baseUrl = getApiBaseUrl();
+        const res = await fetch(
+          `${baseUrl}/api/v1/boards/${boardId}/tasks/${taskId}/attachments/${attachmentId}/download`,
+          { headers },
+        );
+        if (!res.ok) return null;
+        const blob = await res.blob();
+        return URL.createObjectURL(blob);
+      } catch {
+        return null;
+      }
+    },
+    [],
+  );
+
+  /** Trigger an authenticated file download for an attachment. */
+  const handleDownloadAttachment = useCallback(
+    async (attachmentId: string, filename: string) => {
+      if (!selectedTask || !boardId) return;
+      const blobUrl = await getAuthenticatedBlobUrl(attachmentId, boardId as string, selectedTask.id);
+      if (!blobUrl) return;
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    },
+    [boardId, selectedTask, getAuthenticatedBlobUrl],
+  );
 
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const tasksRef = useRef<Task[]>([]);
@@ -2538,12 +2580,54 @@ export default function BoardDetailPage() {
           { method: "DELETE" },
         );
         setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+        // Revoke and remove blob URL for deleted attachment
+        setAttachmentBlobUrls((prev) => {
+          const url = prev[attachmentId];
+          if (url) URL.revokeObjectURL(url);
+          const next = { ...prev };
+          delete next[attachmentId];
+          return next;
+        });
       } catch {
         // silent
       }
     },
     [boardId, selectedTask],
   );
+
+  // Fetch authenticated blob URLs for media attachments (images/videos)
+  useEffect(() => {
+    if (!attachments.length || !boardId || !selectedTask) return;
+    let cancelled = false;
+    const mediaAtts = attachments.filter(
+      (a) => a.mimetype.startsWith("image/") || a.mimetype.startsWith("video/"),
+    );
+    if (!mediaAtts.length) return;
+
+    (async () => {
+      const urls: Record<string, string> = {};
+      for (const att of mediaAtts) {
+        if (cancelled) break;
+        const url = await getAuthenticatedBlobUrl(att.id, boardId as string, selectedTask.id);
+        if (url) urls[att.id] = url;
+      }
+      if (!cancelled) {
+        setAttachmentBlobUrls((prev) => ({ ...prev, ...urls }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attachments, boardId, selectedTask, getAuthenticatedBlobUrl]);
+
+  // Clean up blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(attachmentBlobUrls).forEach((url) => URL.revokeObjectURL(url));
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadComments = useCallback(
     async (taskId: string) => {
@@ -4161,7 +4245,7 @@ export default function BoardDetailPage() {
                   {attachments.map((att) => {
                     const isImage = att.mimetype.startsWith("image/");
                     const isVideo = att.mimetype.startsWith("video/");
-                    const downloadUrl = `/api/v1/boards/${boardId}/tasks/${selectedTask?.id}/attachments/${att.id}/download`;
+                    const blobUrl = attachmentBlobUrls[att.id];
                     const sizeLabel = att.file_size >= 1024 * 1024
                       ? `${(att.file_size / (1024 * 1024)).toFixed(1)} MB`
                       : `${(att.file_size / 1024).toFixed(1)} KB`;
@@ -4170,22 +4254,30 @@ export default function BoardDetailPage() {
                         key={att.id}
                         className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-2"
                       >
-                        {isImage ? (
-                          <a href={downloadUrl} target="_blank" rel="noopener noreferrer">
+                        {isImage && blobUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleDownloadAttachment(att.id, att.filename)}
+                            className="block w-full cursor-pointer"
+                          >
                             <img
-                              src={downloadUrl}
+                              src={blobUrl}
                               alt={att.filename}
                               className="mb-2 max-h-48 w-full rounded-md object-contain"
                             />
-                          </a>
-                        ) : isVideo ? (
+                          </button>
+                        ) : isVideo && blobUrl ? (
                           <video
                             controls
                             className="mb-2 max-h-48 w-full rounded-md"
                             preload="metadata"
                           >
-                            <source src={downloadUrl} type={att.mimetype} />
+                            <source src={blobUrl} type={att.mimetype} />
                           </video>
+                        ) : (isImage || isVideo) && !blobUrl ? (
+                          <div className="mb-2 flex h-24 items-center justify-center rounded-md bg-muted/30">
+                            <span className="text-xs text-muted">Loading preview…</span>
+                          </div>
                         ) : null}
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
@@ -4194,14 +4286,13 @@ export default function BoardDetailPage() {
                             ) : (
                               <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted" />
                             )}
-                            <a
-                              href={downloadUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="truncate text-xs font-medium text-strong hover:underline"
+                            <button
+                              type="button"
+                              onClick={() => void handleDownloadAttachment(att.id, att.filename)}
+                              className="truncate text-xs font-medium text-strong hover:underline cursor-pointer text-left"
                             >
                               {att.filename}
-                            </a>
+                            </button>
                             <span className="shrink-0 text-xs text-muted">{sizeLabel}</span>
                           </div>
                           {canWrite ? (
