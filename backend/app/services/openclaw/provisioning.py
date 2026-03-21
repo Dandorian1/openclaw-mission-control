@@ -703,28 +703,63 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
         self,
         entries: list[tuple[str, str, dict[str, Any]]],
     ) -> None:
-        base_hash, raw_list, config_data = await _gateway_config_agent_list(self._config)
-        entry_by_id = _heartbeat_entry_map(entries)
-        new_list = _updated_agent_list(raw_list, entry_by_id)
+        _max_retries = 3
+        for _attempt in range(_max_retries):
+            base_hash, raw_list, config_data = await _gateway_config_agent_list(self._config)
+            entry_by_id = _heartbeat_entry_map(entries)
+            new_list = _updated_agent_list(raw_list, entry_by_id)
 
-        channels_patch = _channel_heartbeat_visibility_patch(config_data)
-        tools_patch = _tools_exec_host_patch(config_data)
+            channels_patch = _channel_heartbeat_visibility_patch(config_data)
+            tools_patch = _tools_exec_host_patch(config_data)
 
-        # Skip config.patch entirely when nothing changed — avoids an unnecessary
-        # gateway SIGUSR1 restart that rotates agent tokens and breaks active sessions.
-        if new_list == raw_list and channels_patch is None and tools_patch is None:
-            logger.debug("patch_agent_heartbeats: no changes detected, skipping config.patch")
-            return
+            # Skip config.patch entirely when nothing changed — avoids an unnecessary
+            # gateway SIGUSR1 restart that rotates agent tokens and breaks active sessions.
+            if new_list == raw_list and channels_patch is None and tools_patch is None:
+                logger.debug("patch_agent_heartbeats: no changes detected, skipping config.patch")
+                return
 
-        patch: dict[str, Any] = {"agents": {"list": new_list}}
-        if channels_patch is not None:
-            patch["channels"] = channels_patch
-        if tools_patch is not None:
-            patch["tools"] = tools_patch
-        params = {"raw": json.dumps(patch)}
-        if base_hash:
-            params["baseHash"] = base_hash
-        await openclaw_call("config.patch", params, config=self._config)
+            patch: dict[str, Any] = {"agents": {"list": new_list}}
+            if channels_patch is not None:
+                patch["channels"] = channels_patch
+            if tools_patch is not None:
+                patch["tools"] = tools_patch
+            params = {"raw": json.dumps(patch)}
+            if base_hash:
+                params["baseHash"] = base_hash
+            try:
+                await openclaw_call("config.patch", params, config=self._config)
+                return
+            except OpenClawGatewayError as exc:
+                error_msg = str(exc).lower()
+                is_rate_limited = "rate limit" in error_msg or "retry after" in error_msg
+                is_hash_conflict = "config changed since last load" in error_msg
+                if (is_rate_limited or is_hash_conflict) and _attempt < _max_retries - 1:
+                    # Extract retry delay from error message (e.g. "retry after 11s")
+                    retry_delay = _extract_retry_delay(error_msg) if is_rate_limited else 1.0
+                    logger.warning(
+                        "patch_agent_heartbeats: %s (attempt %d/%d), retrying in %.1fs",
+                        "rate limited" if is_rate_limited else "hash conflict",
+                        _attempt + 1,
+                        _max_retries,
+                        retry_delay,
+                    )
+                    await asyncio.sleep(retry_delay)
+                    continue
+                raise
+
+
+_RETRY_DELAY_RE = re.compile(r"retry\s+after\s+(\d+)\s*s", re.IGNORECASE)
+
+
+def _extract_retry_delay(error_msg: str) -> float:
+    """Extract retry delay in seconds from a gateway rate-limit error message.
+
+    Falls back to 15s if the delay cannot be parsed.
+    """
+    match = _RETRY_DELAY_RE.search(error_msg)
+    if match:
+        return float(match.group(1)) + 1.0  # add 1s safety margin
+    return 15.0
 
 
 async def _gateway_config_agent_list(
