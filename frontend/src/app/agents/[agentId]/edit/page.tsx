@@ -257,7 +257,7 @@ export default function EditAgentPage() {
   const resolvedPreferredModel =
     preferredModel ?? (loadedAgent?.preferred_model as string | undefined) ?? "";
   const resolvedHeartbeatModel =
-    heartbeatModel ?? ((loadedAgent as unknown as Record<string, unknown>)?.heartbeat_model as string | undefined) ?? "";
+    heartbeatModel ?? loadedAgent?.heartbeat_model ?? "";
   const resolvedIdentityProfile = identityProfile ?? loadedIdentityProfile;
 
   const resolvedBoardId = useMemo(() => {

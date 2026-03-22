@@ -13,19 +13,25 @@ import type { AgentCreateIdentityProfile } from "./agentCreateIdentityProfile";
 export interface AgentCreate {
   /** Board id that scopes this agent. Omit only when policy allows global agents. */
   board_id?: string | null;
+  /**
+   * Human-readable agent display name.
+   * @minLength 1
+   */
+  name: string;
+  /** Current lifecycle state used by coordinator logic. */
+  status?: string;
   /** Runtime heartbeat behavior overrides for this agent. */
   heartbeat_config?: AgentCreateHeartbeatConfig;
   /** Optional profile hints used by routing and policy checks. */
   identity_profile?: AgentCreateIdentityProfile;
   /** Template that helps define initial intent and behavior. */
   identity_template?: string | null;
-  /**
-   * Human-readable agent display name.
-   * @minLength 1
-   */
-  name: string;
   /** Template representing deeper agent instructions. */
   soul_template?: string | null;
-  /** Current lifecycle state used by coordinator logic. */
-  status?: string;
+  /** Preferred model effort tier for this agent. Controls the model complexity used when this agent runs. Accepted values: 'low', 'medium', 'high', or null (use gateway default). */
+  model_effort_tier?: string | null;
+  /** Preferred model for this agent in 'provider/model' format (e.g. 'anthropic/claude-opus-4-6'). When set, the gateway uses this specific model for this agent's sessions instead of the gateway default. Takes precedence over model_effort_tier when both are set. */
+  preferred_model?: string | null;
+  /** Model for heartbeat check-ins in 'provider/model' format (e.g. 'anthropic/claude-sonnet-4-6'). When set, heartbeat runs use this cheaper model instead of the agent's preferred model, reducing token costs. */
+  heartbeat_model?: string | null;
 }

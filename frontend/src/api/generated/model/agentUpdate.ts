@@ -13,30 +13,26 @@ import type { AgentUpdateIdentityProfile } from "./agentUpdateIdentityProfile";
 export interface AgentUpdate {
   /** Optional new board assignment. */
   board_id?: string | null;
+  /** Whether this agent is treated as the board gateway main. */
+  is_gateway_main?: boolean | null;
+  /** Whether this board-scoped agent should act as the board lead. */
+  is_board_lead?: boolean | null;
+  /** Optional replacement display name. */
+  name?: string | null;
+  /** Optional replacement lifecycle status. */
+  status?: string | null;
   /** Optional heartbeat policy override. */
   heartbeat_config?: AgentUpdateHeartbeatConfig;
   /** Optional identity profile update values. */
   identity_profile?: AgentUpdateIdentityProfile;
   /** Optional replacement identity template. */
   identity_template?: string | null;
-  /** Whether this board-scoped agent should act as the board lead. */
-  is_board_lead?: boolean | null;
-  /** Whether this agent is treated as the board gateway main. */
-  is_gateway_main?: boolean | null;
-  /** Optional replacement display name. */
-  name?: string | null;
   /** Optional replacement soul template. */
   soul_template?: string | null;
-  /** Optional replacement lifecycle status. */
-  status?: string | null;
-  /**
-   * Optional model effort tier override.
-   * Accepted values: 'low', 'medium', 'high', or null to clear.
-   */
+  /** Optional model effort tier override. Accepted values: 'low', 'medium', 'high', or null to clear. */
   model_effort_tier?: string | null;
-  /**
-   * Optional preferred model in 'provider/model' format.
-   * e.g. 'anthropic/claude-opus-4-6'. Set to null to revert to gateway default.
-   */
+  /** Optional preferred model in 'provider/model' format. Set to null to revert to gateway default. */
   preferred_model?: string | null;
+  /** Optional model for heartbeat runs in 'provider/model' format. Use a cheaper model for heartbeat check-ins to reduce token costs. Set to null to use the agent's preferred model. */
+  heartbeat_model?: string | null;
 }

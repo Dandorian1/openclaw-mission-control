@@ -138,18 +138,37 @@ async def get_board_or_404(
     return board
 
 
+async def _agent_boards_share_group(
+    session: AsyncSession,
+    agent_board_id: UUID,
+    target_board: Board,
+) -> bool:
+    """Return True if the agent's board and the target board belong to the same group."""
+    if target_board.board_group_id is None:
+        return False
+    agent_board = await Board.objects.by_id(agent_board_id).first(session)
+    if agent_board is None or agent_board.board_group_id is None:
+        return False
+    return agent_board.board_group_id == target_board.board_group_id
+
+
 async def get_board_for_actor_read(
     board_id: UUID,
     session: AsyncSession = SESSION_DEP,
     actor: ActorContext = ACTOR_DEP,
 ) -> Board:
-    """Load a board and enforce actor read access."""
+    """Load a board and enforce actor read access.
+
+    Agents may read boards in the same board group (cross-board visibility).
+    """
     board = await Board.objects.by_id(board_id).first(session)
     if board is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     if actor.actor_type == "agent":
         if actor.agent and actor.agent.board_id and actor.agent.board_id != board.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+            # Allow cross-board read if both boards share a board group.
+            if not await _agent_boards_share_group(session, actor.agent.board_id, board):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
         return board
     if actor.user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)

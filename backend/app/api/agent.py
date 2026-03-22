@@ -260,6 +260,26 @@ def _guard_task_access(agent_ctx: AgentAuthContext, task: Task) -> None:
     OpenClawAuthorizationPolicy.require_board_write_access(allowed=allowed)
 
 
+async def _guard_task_read_access(
+    agent_ctx: AgentAuthContext,
+    task: Task,
+    session: AsyncSession,
+) -> None:
+    """Guard read access to a task, allowing cross-board reads within a group."""
+    if not (agent_ctx.agent.board_id and task.board_id):
+        return
+    if agent_ctx.agent.board_id == task.board_id:
+        return
+    # Cross-board: allow if both boards share a board group.
+    from app.api.deps import _agent_boards_share_group
+
+    board = await Board.objects.by_id(task.board_id).first(session)
+    if board is None or not await _agent_boards_share_group(
+        session, agent_ctx.agent.board_id, board
+    ):
+        OpenClawAuthorizationPolicy.require_board_write_access(allowed=False)
+
+
 async def _require_board_not_paused(
     board_id: object,
     session: object,
@@ -1099,8 +1119,9 @@ async def list_task_comments(
     """List task comments visible to the authenticated agent.
 
     Read this before posting updates to avoid duplicate or low-value comments.
+    Allows cross-board reads within the same board group.
     """
-    _guard_task_access(agent_ctx, task)
+    await _guard_task_read_access(agent_ctx, task, session)
     return await tasks_api.list_task_comments(
         task=task,
         session=session,
@@ -1157,8 +1178,11 @@ async def list_task_attachments(
     session: AsyncSession = SESSION_DEP,
     agent_ctx: AgentAuthContext = AGENT_CTX_DEP,
 ) -> list:
-    """List attachments for a task."""
-    _guard_task_access(agent_ctx, task)
+    """List attachments for a task.
+
+    Allows cross-board reads within the same board group.
+    """
+    await _guard_task_read_access(agent_ctx, task, session)
     return await tasks_api.list_task_attachments(
         task=task,
         session=session,

@@ -22,7 +22,13 @@ import type {
 
 import type {
   GatewayCommandsResponse,
+  GatewayCostResponse,
   GatewayCreate,
+  GatewayModelConfig,
+  GatewayModelConfigUpdate,
+  GatewayModelsResponse,
+  GatewayProviderUsageApiV1GatewaysUsageProvidersGetParams,
+  GatewayProviderUsageResponse,
   GatewayRead,
   GatewaySessionHistoryResponse,
   GatewaySessionMessageRequest,
@@ -30,12 +36,16 @@ import type {
   GatewaySessionsResponse,
   GatewayTemplatesSyncResult,
   GatewayUpdate,
+  GatewayUsageApiV1GatewaysUsageGetParams,
+  GatewayUsageCostApiV1GatewaysUsageCostGetParams,
+  GatewayUsageResponse,
   GatewaysStatusApiV1GatewaysStatusGetParams,
   GatewaysStatusResponse,
   GetGatewaySessionApiV1GatewaysSessionsSessionIdGetParams,
   GetSessionHistoryApiV1GatewaysSessionsSessionIdHistoryGetParams,
   HTTPValidationError,
   LimitOffsetPageTypeVarCustomizedGatewayRead,
+  ListGatewayModelsApiV1GatewaysModelsGetParams,
   ListGatewaySessionsApiV1GatewaysSessionsGetParams,
   ListGatewaysApiV1GatewaysGetParams,
   OkResponse,
@@ -48,34 +58,34 @@ import { customFetch } from "../../mutator";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * List gateways for the caller's organization.
- * @summary List Gateways
+ * Return gateway connectivity and session status.
+ * @summary Gateways Status
  */
-export type listGatewaysApiV1GatewaysGetResponse200 = {
-  data: LimitOffsetPageTypeVarCustomizedGatewayRead;
+export type gatewaysStatusApiV1GatewaysStatusGetResponse200 = {
+  data: GatewaysStatusResponse;
   status: 200;
 };
 
-export type listGatewaysApiV1GatewaysGetResponse422 = {
+export type gatewaysStatusApiV1GatewaysStatusGetResponse422 = {
   data: HTTPValidationError;
   status: 422;
 };
 
-export type listGatewaysApiV1GatewaysGetResponseSuccess =
-  listGatewaysApiV1GatewaysGetResponse200 & {
+export type gatewaysStatusApiV1GatewaysStatusGetResponseSuccess =
+  gatewaysStatusApiV1GatewaysStatusGetResponse200 & {
     headers: Headers;
   };
-export type listGatewaysApiV1GatewaysGetResponseError =
-  listGatewaysApiV1GatewaysGetResponse422 & {
+export type gatewaysStatusApiV1GatewaysStatusGetResponseError =
+  gatewaysStatusApiV1GatewaysStatusGetResponse422 & {
     headers: Headers;
   };
 
-export type listGatewaysApiV1GatewaysGetResponse =
-  | listGatewaysApiV1GatewaysGetResponseSuccess
-  | listGatewaysApiV1GatewaysGetResponseError;
+export type gatewaysStatusApiV1GatewaysStatusGetResponse =
+  | gatewaysStatusApiV1GatewaysStatusGetResponseSuccess
+  | gatewaysStatusApiV1GatewaysStatusGetResponseError;
 
-export const getListGatewaysApiV1GatewaysGetUrl = (
-  params?: ListGatewaysApiV1GatewaysGetParams,
+export const getGatewaysStatusApiV1GatewaysStatusGetUrl = (
+  params?: GatewaysStatusApiV1GatewaysStatusGetParams,
 ) => {
   const normalizedParams = new URLSearchParams();
 
@@ -88,16 +98,16 @@ export const getListGatewaysApiV1GatewaysGetUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/api/v1/gateways?${stringifiedParams}`
-    : `/api/v1/gateways`;
+    ? `/api/v1/gateways/status?${stringifiedParams}`
+    : `/api/v1/gateways/status`;
 };
 
-export const listGatewaysApiV1GatewaysGet = async (
-  params?: ListGatewaysApiV1GatewaysGetParams,
+export const gatewaysStatusApiV1GatewaysStatusGet = async (
+  params?: GatewaysStatusApiV1GatewaysStatusGetParams,
   options?: RequestInit,
-): Promise<listGatewaysApiV1GatewaysGetResponse> => {
-  return customFetch<listGatewaysApiV1GatewaysGetResponse>(
-    getListGatewaysApiV1GatewaysGetUrl(params),
+): Promise<gatewaysStatusApiV1GatewaysStatusGetResponse> => {
+  return customFetch<gatewaysStatusApiV1GatewaysStatusGetResponse>(
+    getGatewaysStatusApiV1GatewaysStatusGetUrl(params),
     {
       ...options,
       method: "GET",
@@ -105,21 +115,21 @@ export const listGatewaysApiV1GatewaysGet = async (
   );
 };
 
-export const getListGatewaysApiV1GatewaysGetQueryKey = (
-  params?: ListGatewaysApiV1GatewaysGetParams,
+export const getGatewaysStatusApiV1GatewaysStatusGetQueryKey = (
+  params?: GatewaysStatusApiV1GatewaysStatusGetParams,
 ) => {
-  return [`/api/v1/gateways`, ...(params ? [params] : [])] as const;
+  return [`/api/v1/gateways/status`, ...(params ? [params] : [])] as const;
 };
 
-export const getListGatewaysApiV1GatewaysGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
+export const getGatewaysStatusApiV1GatewaysStatusGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
   TError = HTTPValidationError,
 >(
-  params?: ListGatewaysApiV1GatewaysGetParams,
+  params?: GatewaysStatusApiV1GatewaysStatusGetParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
+        Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
         TError,
         TData
       >
@@ -127,344 +137,48 @@ export const getListGatewaysApiV1GatewaysGetQueryOptions = <
     request?: SecondParameter<typeof customFetch>;
   },
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getListGatewaysApiV1GatewaysGetQueryKey(params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>
-  > = ({ signal }) =>
-    listGatewaysApiV1GatewaysGet(params, { signal, ...requestOptions });
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type ListGatewaysApiV1GatewaysGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>
->;
-export type ListGatewaysApiV1GatewaysGetQueryError = HTTPValidationError;
-
-export function useListGatewaysApiV1GatewaysGet<
-  TData = Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
-  TError = HTTPValidationError,
->(
-  params: undefined | ListGatewaysApiV1GatewaysGetParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
-          TError,
-          Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useListGatewaysApiV1GatewaysGet<
-  TData = Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
-  TError = HTTPValidationError,
->(
-  params?: ListGatewaysApiV1GatewaysGetParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
-          TError,
-          Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useListGatewaysApiV1GatewaysGet<
-  TData = Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
-  TError = HTTPValidationError,
->(
-  params?: ListGatewaysApiV1GatewaysGetParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary List Gateways
- */
-
-export function useListGatewaysApiV1GatewaysGet<
-  TData = Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
-  TError = HTTPValidationError,
->(
-  params?: ListGatewaysApiV1GatewaysGetParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getListGatewaysApiV1GatewaysGetQueryOptions(
-    params,
-    options,
-  );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-/**
- * Create a gateway and provision or refresh its main agent.
- * @summary Create Gateway
- */
-export type createGatewayApiV1GatewaysPostResponse200 = {
-  data: GatewayRead;
-  status: 200;
-};
-
-export type createGatewayApiV1GatewaysPostResponse422 = {
-  data: HTTPValidationError;
-  status: 422;
-};
-
-export type createGatewayApiV1GatewaysPostResponseSuccess =
-  createGatewayApiV1GatewaysPostResponse200 & {
-    headers: Headers;
-  };
-export type createGatewayApiV1GatewaysPostResponseError =
-  createGatewayApiV1GatewaysPostResponse422 & {
-    headers: Headers;
-  };
-
-export type createGatewayApiV1GatewaysPostResponse =
-  | createGatewayApiV1GatewaysPostResponseSuccess
-  | createGatewayApiV1GatewaysPostResponseError;
-
-export const getCreateGatewayApiV1GatewaysPostUrl = () => {
-  return `/api/v1/gateways`;
-};
-
-export const createGatewayApiV1GatewaysPost = async (
-  gatewayCreate: GatewayCreate,
-  options?: RequestInit,
-): Promise<createGatewayApiV1GatewaysPostResponse> => {
-  return customFetch<createGatewayApiV1GatewaysPostResponse>(
-    getCreateGatewayApiV1GatewaysPostUrl(),
-    {
-      ...options,
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...options?.headers },
-      body: JSON.stringify(gatewayCreate),
-    },
-  );
-};
-
-export const getCreateGatewayApiV1GatewaysPostMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createGatewayApiV1GatewaysPost>>,
-    TError,
-    { data: GatewayCreate },
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createGatewayApiV1GatewaysPost>>,
-  TError,
-  { data: GatewayCreate },
-  TContext
-> => {
-  const mutationKey = ["createGatewayApiV1GatewaysPost"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createGatewayApiV1GatewaysPost>>,
-    { data: GatewayCreate }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return createGatewayApiV1GatewaysPost(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type CreateGatewayApiV1GatewaysPostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createGatewayApiV1GatewaysPost>>
->;
-export type CreateGatewayApiV1GatewaysPostMutationBody = GatewayCreate;
-export type CreateGatewayApiV1GatewaysPostMutationError = HTTPValidationError;
-
-/**
- * @summary Create Gateway
- */
-export const useCreateGatewayApiV1GatewaysPost = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof createGatewayApiV1GatewaysPost>>,
-      TError,
-      { data: GatewayCreate },
-      TContext
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof createGatewayApiV1GatewaysPost>>,
-  TError,
-  { data: GatewayCreate },
-  TContext
-> => {
-  return useMutation(
-    getCreateGatewayApiV1GatewaysPostMutationOptions(options),
-    queryClient,
-  );
-};
-/**
- * Return supported gateway protocol methods and events.
- * @summary Gateway Commands
- */
-export type gatewayCommandsApiV1GatewaysCommandsGetResponse200 = {
-  data: GatewayCommandsResponse;
-  status: 200;
-};
-
-export type gatewayCommandsApiV1GatewaysCommandsGetResponseSuccess =
-  gatewayCommandsApiV1GatewaysCommandsGetResponse200 & {
-    headers: Headers;
-  };
-export type gatewayCommandsApiV1GatewaysCommandsGetResponse =
-  gatewayCommandsApiV1GatewaysCommandsGetResponseSuccess;
-
-export const getGatewayCommandsApiV1GatewaysCommandsGetUrl = () => {
-  return `/api/v1/gateways/commands`;
-};
-
-export const gatewayCommandsApiV1GatewaysCommandsGet = async (
-  options?: RequestInit,
-): Promise<gatewayCommandsApiV1GatewaysCommandsGetResponse> => {
-  return customFetch<gatewayCommandsApiV1GatewaysCommandsGetResponse>(
-    getGatewayCommandsApiV1GatewaysCommandsGetUrl(),
-    {
-      ...options,
-      method: "GET",
-    },
-  );
-};
-
-export const getGatewayCommandsApiV1GatewaysCommandsGetQueryKey = () => {
-  return [`/api/v1/gateways/commands`] as const;
-};
-
-export const getGatewayCommandsApiV1GatewaysCommandsGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
     queryOptions?.queryKey ??
-    getGatewayCommandsApiV1GatewaysCommandsGetQueryKey();
+    getGatewaysStatusApiV1GatewaysStatusGetQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>
+    Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>
   > = ({ signal }) =>
-    gatewayCommandsApiV1GatewaysCommandsGet({ signal, ...requestOptions });
+    gatewaysStatusApiV1GatewaysStatusGet(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+    Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type GatewayCommandsApiV1GatewaysCommandsGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>
+export type GatewaysStatusApiV1GatewaysStatusGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>
 >;
-export type GatewayCommandsApiV1GatewaysCommandsGetQueryError = unknown;
+export type GatewaysStatusApiV1GatewaysStatusGetQueryError =
+  HTTPValidationError;
 
-export function useGatewayCommandsApiV1GatewaysCommandsGet<
-  TData = Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
-  TError = unknown,
+export function useGatewaysStatusApiV1GatewaysStatusGet<
+  TData = Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+  TError = HTTPValidationError,
 >(
+  params: undefined | GatewaysStatusApiV1GatewaysStatusGetParams,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+        Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+          Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
           TError,
-          Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>
+          Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>
         >,
         "initialData"
       >;
@@ -474,23 +188,24 @@ export function useGatewayCommandsApiV1GatewaysCommandsGet<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useGatewayCommandsApiV1GatewaysCommandsGet<
-  TData = Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
-  TError = unknown,
+export function useGatewaysStatusApiV1GatewaysStatusGet<
+  TData = Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+  TError = HTTPValidationError,
 >(
+  params?: GatewaysStatusApiV1GatewaysStatusGetParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+        Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+          Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
           TError,
-          Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>
+          Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>
         >,
         "initialData"
       >;
@@ -500,14 +215,15 @@ export function useGatewayCommandsApiV1GatewaysCommandsGet<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useGatewayCommandsApiV1GatewaysCommandsGet<
-  TData = Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
-  TError = unknown,
+export function useGatewaysStatusApiV1GatewaysStatusGet<
+  TData = Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+  TError = HTTPValidationError,
 >(
+  params?: GatewaysStatusApiV1GatewaysStatusGetParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+        Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
         TError,
         TData
       >
@@ -519,17 +235,18 @@ export function useGatewayCommandsApiV1GatewaysCommandsGet<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Gateway Commands
+ * @summary Gateways Status
  */
 
-export function useGatewayCommandsApiV1GatewaysCommandsGet<
-  TData = Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
-  TError = unknown,
+export function useGatewaysStatusApiV1GatewaysStatusGet<
+  TData = Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+  TError = HTTPValidationError,
 >(
+  params?: GatewaysStatusApiV1GatewaysStatusGetParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+        Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
         TError,
         TData
       >
@@ -540,8 +257,10 @@ export function useGatewayCommandsApiV1GatewaysCommandsGet<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions =
-    getGatewayCommandsApiV1GatewaysCommandsGetQueryOptions(options);
+  const queryOptions = getGatewaysStatusApiV1GatewaysStatusGetQueryOptions(
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -1574,34 +1293,37 @@ export const useSendGatewaySessionMessageApiV1GatewaysSessionsSessionIdMessagePo
     );
   };
 /**
- * Return gateway connectivity and session status.
- * @summary Gateways Status
+ * Return the list of models available on the gateway.
+
+Calls the ``models.list`` RPC on the gateway connected to the given board.
+Returns an empty list with an error field if the gateway is unreachable.
+ * @summary List Gateway Models
  */
-export type gatewaysStatusApiV1GatewaysStatusGetResponse200 = {
-  data: GatewaysStatusResponse;
+export type listGatewayModelsApiV1GatewaysModelsGetResponse200 = {
+  data: GatewayModelsResponse;
   status: 200;
 };
 
-export type gatewaysStatusApiV1GatewaysStatusGetResponse422 = {
+export type listGatewayModelsApiV1GatewaysModelsGetResponse422 = {
   data: HTTPValidationError;
   status: 422;
 };
 
-export type gatewaysStatusApiV1GatewaysStatusGetResponseSuccess =
-  gatewaysStatusApiV1GatewaysStatusGetResponse200 & {
+export type listGatewayModelsApiV1GatewaysModelsGetResponseSuccess =
+  listGatewayModelsApiV1GatewaysModelsGetResponse200 & {
     headers: Headers;
   };
-export type gatewaysStatusApiV1GatewaysStatusGetResponseError =
-  gatewaysStatusApiV1GatewaysStatusGetResponse422 & {
+export type listGatewayModelsApiV1GatewaysModelsGetResponseError =
+  listGatewayModelsApiV1GatewaysModelsGetResponse422 & {
     headers: Headers;
   };
 
-export type gatewaysStatusApiV1GatewaysStatusGetResponse =
-  | gatewaysStatusApiV1GatewaysStatusGetResponseSuccess
-  | gatewaysStatusApiV1GatewaysStatusGetResponseError;
+export type listGatewayModelsApiV1GatewaysModelsGetResponse =
+  | listGatewayModelsApiV1GatewaysModelsGetResponseSuccess
+  | listGatewayModelsApiV1GatewaysModelsGetResponseError;
 
-export const getGatewaysStatusApiV1GatewaysStatusGetUrl = (
-  params?: GatewaysStatusApiV1GatewaysStatusGetParams,
+export const getListGatewayModelsApiV1GatewaysModelsGetUrl = (
+  params?: ListGatewayModelsApiV1GatewaysModelsGetParams,
 ) => {
   const normalizedParams = new URLSearchParams();
 
@@ -1614,16 +1336,16 @@ export const getGatewaysStatusApiV1GatewaysStatusGetUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/api/v1/gateways/status?${stringifiedParams}`
-    : `/api/v1/gateways/status`;
+    ? `/api/v1/gateways/models?${stringifiedParams}`
+    : `/api/v1/gateways/models`;
 };
 
-export const gatewaysStatusApiV1GatewaysStatusGet = async (
-  params?: GatewaysStatusApiV1GatewaysStatusGetParams,
+export const listGatewayModelsApiV1GatewaysModelsGet = async (
+  params?: ListGatewayModelsApiV1GatewaysModelsGetParams,
   options?: RequestInit,
-): Promise<gatewaysStatusApiV1GatewaysStatusGetResponse> => {
-  return customFetch<gatewaysStatusApiV1GatewaysStatusGetResponse>(
-    getGatewaysStatusApiV1GatewaysStatusGetUrl(params),
+): Promise<listGatewayModelsApiV1GatewaysModelsGetResponse> => {
+  return customFetch<listGatewayModelsApiV1GatewaysModelsGetResponse>(
+    getListGatewayModelsApiV1GatewaysModelsGetUrl(params),
     {
       ...options,
       method: "GET",
@@ -1631,21 +1353,21 @@ export const gatewaysStatusApiV1GatewaysStatusGet = async (
   );
 };
 
-export const getGatewaysStatusApiV1GatewaysStatusGetQueryKey = (
-  params?: GatewaysStatusApiV1GatewaysStatusGetParams,
+export const getListGatewayModelsApiV1GatewaysModelsGetQueryKey = (
+  params?: ListGatewayModelsApiV1GatewaysModelsGetParams,
 ) => {
-  return [`/api/v1/gateways/status`, ...(params ? [params] : [])] as const;
+  return [`/api/v1/gateways/models`, ...(params ? [params] : [])] as const;
 };
 
-export const getGatewaysStatusApiV1GatewaysStatusGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+export const getListGatewayModelsApiV1GatewaysModelsGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>,
   TError = HTTPValidationError,
 >(
-  params?: GatewaysStatusApiV1GatewaysStatusGetParams,
+  params?: ListGatewayModelsApiV1GatewaysModelsGetParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+        Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>,
         TError,
         TData
       >
@@ -1657,44 +1379,47 @@ export const getGatewaysStatusApiV1GatewaysStatusGetQueryOptions = <
 
   const queryKey =
     queryOptions?.queryKey ??
-    getGatewaysStatusApiV1GatewaysStatusGetQueryKey(params);
+    getListGatewayModelsApiV1GatewaysModelsGetQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>
+    Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>
   > = ({ signal }) =>
-    gatewaysStatusApiV1GatewaysStatusGet(params, { signal, ...requestOptions });
+    listGatewayModelsApiV1GatewaysModelsGet(params, {
+      signal,
+      ...requestOptions,
+    });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+    Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type GatewaysStatusApiV1GatewaysStatusGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>
+export type ListGatewayModelsApiV1GatewaysModelsGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>
 >;
-export type GatewaysStatusApiV1GatewaysStatusGetQueryError =
+export type ListGatewayModelsApiV1GatewaysModelsGetQueryError =
   HTTPValidationError;
 
-export function useGatewaysStatusApiV1GatewaysStatusGet<
-  TData = Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+export function useListGatewayModelsApiV1GatewaysModelsGet<
+  TData = Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>,
   TError = HTTPValidationError,
 >(
-  params: undefined | GatewaysStatusApiV1GatewaysStatusGetParams,
+  params: undefined | ListGatewayModelsApiV1GatewaysModelsGetParams,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+        Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+          Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>,
           TError,
-          Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>
+          Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>
         >,
         "initialData"
       >;
@@ -1704,24 +1429,24 @@ export function useGatewaysStatusApiV1GatewaysStatusGet<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useGatewaysStatusApiV1GatewaysStatusGet<
-  TData = Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+export function useListGatewayModelsApiV1GatewaysModelsGet<
+  TData = Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>,
   TError = HTTPValidationError,
 >(
-  params?: GatewaysStatusApiV1GatewaysStatusGetParams,
+  params?: ListGatewayModelsApiV1GatewaysModelsGetParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+        Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+          Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>,
           TError,
-          Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>
+          Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>
         >,
         "initialData"
       >;
@@ -1731,15 +1456,15 @@ export function useGatewaysStatusApiV1GatewaysStatusGet<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useGatewaysStatusApiV1GatewaysStatusGet<
-  TData = Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+export function useListGatewayModelsApiV1GatewaysModelsGet<
+  TData = Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>,
   TError = HTTPValidationError,
 >(
-  params?: GatewaysStatusApiV1GatewaysStatusGetParams,
+  params?: ListGatewayModelsApiV1GatewaysModelsGetParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+        Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>,
         TError,
         TData
       >
@@ -1751,18 +1476,18 @@ export function useGatewaysStatusApiV1GatewaysStatusGet<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Gateways Status
+ * @summary List Gateway Models
  */
 
-export function useGatewaysStatusApiV1GatewaysStatusGet<
-  TData = Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+export function useListGatewayModelsApiV1GatewaysModelsGet<
+  TData = Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>,
   TError = HTTPValidationError,
 >(
-  params?: GatewaysStatusApiV1GatewaysStatusGetParams,
+  params?: ListGatewayModelsApiV1GatewaysModelsGetParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof gatewaysStatusApiV1GatewaysStatusGet>>,
+        Awaited<ReturnType<typeof listGatewayModelsApiV1GatewaysModelsGet>>,
         TError,
         TData
       >
@@ -1773,7 +1498,7 @@ export function useGatewaysStatusApiV1GatewaysStatusGet<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getGatewaysStatusApiV1GatewaysStatusGetQueryOptions(
+  const queryOptions = getListGatewayModelsApiV1GatewaysModelsGetQueryOptions(
     params,
     options,
   );
@@ -1787,69 +1512,1606 @@ export function useGatewaysStatusApiV1GatewaysStatusGet<
 }
 
 /**
- * Delete a gateway in the caller's organization.
- * @summary Delete Gateway
+ * Return token usage data from the gateway.
+
+Calls the ``sessions.usage`` RPC on the gateway connected to the given board.
+Returns per-session usage data with optional date filtering.
+ * @summary Gateway Usage
  */
-export type deleteGatewayApiV1GatewaysGatewayIdDeleteResponse200 = {
-  data: OkResponse;
+export type gatewayUsageApiV1GatewaysUsageGetResponse200 = {
+  data: GatewayUsageResponse;
   status: 200;
 };
 
-export type deleteGatewayApiV1GatewaysGatewayIdDeleteResponse422 = {
+export type gatewayUsageApiV1GatewaysUsageGetResponse422 = {
   data: HTTPValidationError;
   status: 422;
 };
 
-export type deleteGatewayApiV1GatewaysGatewayIdDeleteResponseSuccess =
-  deleteGatewayApiV1GatewaysGatewayIdDeleteResponse200 & {
+export type gatewayUsageApiV1GatewaysUsageGetResponseSuccess =
+  gatewayUsageApiV1GatewaysUsageGetResponse200 & {
     headers: Headers;
   };
-export type deleteGatewayApiV1GatewaysGatewayIdDeleteResponseError =
-  deleteGatewayApiV1GatewaysGatewayIdDeleteResponse422 & {
+export type gatewayUsageApiV1GatewaysUsageGetResponseError =
+  gatewayUsageApiV1GatewaysUsageGetResponse422 & {
     headers: Headers;
   };
 
-export type deleteGatewayApiV1GatewaysGatewayIdDeleteResponse =
-  | deleteGatewayApiV1GatewaysGatewayIdDeleteResponseSuccess
-  | deleteGatewayApiV1GatewaysGatewayIdDeleteResponseError;
+export type gatewayUsageApiV1GatewaysUsageGetResponse =
+  | gatewayUsageApiV1GatewaysUsageGetResponseSuccess
+  | gatewayUsageApiV1GatewaysUsageGetResponseError;
 
-export const getDeleteGatewayApiV1GatewaysGatewayIdDeleteUrl = (
-  gatewayId: string,
+export const getGatewayUsageApiV1GatewaysUsageGetUrl = (
+  params?: GatewayUsageApiV1GatewaysUsageGetParams,
 ) => {
-  return `/api/v1/gateways/${gatewayId}`;
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/gateways/usage?${stringifiedParams}`
+    : `/api/v1/gateways/usage`;
 };
 
-export const deleteGatewayApiV1GatewaysGatewayIdDelete = async (
-  gatewayId: string,
+export const gatewayUsageApiV1GatewaysUsageGet = async (
+  params?: GatewayUsageApiV1GatewaysUsageGetParams,
   options?: RequestInit,
-): Promise<deleteGatewayApiV1GatewaysGatewayIdDeleteResponse> => {
-  return customFetch<deleteGatewayApiV1GatewaysGatewayIdDeleteResponse>(
-    getDeleteGatewayApiV1GatewaysGatewayIdDeleteUrl(gatewayId),
+): Promise<gatewayUsageApiV1GatewaysUsageGetResponse> => {
+  return customFetch<gatewayUsageApiV1GatewaysUsageGetResponse>(
+    getGatewayUsageApiV1GatewaysUsageGetUrl(params),
     {
       ...options,
-      method: "DELETE",
+      method: "GET",
     },
   );
 };
 
-export const getDeleteGatewayApiV1GatewaysGatewayIdDeleteMutationOptions = <
+export const getGatewayUsageApiV1GatewaysUsageGetQueryKey = (
+  params?: GatewayUsageApiV1GatewaysUsageGetParams,
+) => {
+  return [`/api/v1/gateways/usage`, ...(params ? [params] : [])] as const;
+};
+
+export const getGatewayUsageApiV1GatewaysUsageGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>,
+  TError = HTTPValidationError,
+>(
+  params?: GatewayUsageApiV1GatewaysUsageGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGatewayUsageApiV1GatewaysUsageGetQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>
+  > = ({ signal }) =>
+    gatewayUsageApiV1GatewaysUsageGet(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type GatewayUsageApiV1GatewaysUsageGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>
+>;
+export type GatewayUsageApiV1GatewaysUsageGetQueryError = HTTPValidationError;
+
+export function useGatewayUsageApiV1GatewaysUsageGet<
+  TData = Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>,
+  TError = HTTPValidationError,
+>(
+  params: undefined | GatewayUsageApiV1GatewaysUsageGetParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>,
+          TError,
+          Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGatewayUsageApiV1GatewaysUsageGet<
+  TData = Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>,
+  TError = HTTPValidationError,
+>(
+  params?: GatewayUsageApiV1GatewaysUsageGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>,
+          TError,
+          Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGatewayUsageApiV1GatewaysUsageGet<
+  TData = Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>,
+  TError = HTTPValidationError,
+>(
+  params?: GatewayUsageApiV1GatewaysUsageGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Gateway Usage
+ */
+
+export function useGatewayUsageApiV1GatewaysUsageGet<
+  TData = Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>,
+  TError = HTTPValidationError,
+>(
+  params?: GatewayUsageApiV1GatewaysUsageGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof gatewayUsageApiV1GatewaysUsageGet>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGatewayUsageApiV1GatewaysUsageGetQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Return provider usage/quota status from the gateway.
+
+Uses a 15-minute cache to avoid rate-limiting by providers.
+Calls ``usage.status`` RPC only when cache is stale.
+ * @summary Gateway Provider Usage
+ */
+export type gatewayProviderUsageApiV1GatewaysUsageProvidersGetResponse200 = {
+  data: GatewayProviderUsageResponse;
+  status: 200;
+};
+
+export type gatewayProviderUsageApiV1GatewaysUsageProvidersGetResponse422 = {
+  data: HTTPValidationError;
+  status: 422;
+};
+
+export type gatewayProviderUsageApiV1GatewaysUsageProvidersGetResponseSuccess =
+  gatewayProviderUsageApiV1GatewaysUsageProvidersGetResponse200 & {
+    headers: Headers;
+  };
+export type gatewayProviderUsageApiV1GatewaysUsageProvidersGetResponseError =
+  gatewayProviderUsageApiV1GatewaysUsageProvidersGetResponse422 & {
+    headers: Headers;
+  };
+
+export type gatewayProviderUsageApiV1GatewaysUsageProvidersGetResponse =
+  | gatewayProviderUsageApiV1GatewaysUsageProvidersGetResponseSuccess
+  | gatewayProviderUsageApiV1GatewaysUsageProvidersGetResponseError;
+
+export const getGatewayProviderUsageApiV1GatewaysUsageProvidersGetUrl = (
+  params?: GatewayProviderUsageApiV1GatewaysUsageProvidersGetParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/gateways/usage/providers?${stringifiedParams}`
+    : `/api/v1/gateways/usage/providers`;
+};
+
+export const gatewayProviderUsageApiV1GatewaysUsageProvidersGet = async (
+  params?: GatewayProviderUsageApiV1GatewaysUsageProvidersGetParams,
+  options?: RequestInit,
+): Promise<gatewayProviderUsageApiV1GatewaysUsageProvidersGetResponse> => {
+  return customFetch<gatewayProviderUsageApiV1GatewaysUsageProvidersGetResponse>(
+    getGatewayProviderUsageApiV1GatewaysUsageProvidersGetUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGatewayProviderUsageApiV1GatewaysUsageProvidersGetQueryKey = (
+  params?: GatewayProviderUsageApiV1GatewaysUsageProvidersGetParams,
+) => {
+  return [
+    `/api/v1/gateways/usage/providers`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGatewayProviderUsageApiV1GatewaysUsageProvidersGetQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet>
+    >,
+    TError = HTTPValidationError,
+  >(
+    params?: GatewayProviderUsageApiV1GatewaysUsageProvidersGetParams,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+      request?: SecondParameter<typeof customFetch>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getGatewayProviderUsageApiV1GatewaysUsageProvidersGetQueryKey(params);
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet>
+      >
+    > = ({ signal }) =>
+      gatewayProviderUsageApiV1GatewaysUsageProvidersGet(params, {
+        signal,
+        ...requestOptions,
+      });
+
+    return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+      Awaited<
+        ReturnType<typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet>
+      >,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type GatewayProviderUsageApiV1GatewaysUsageProvidersGetQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet>
+    >
+  >;
+export type GatewayProviderUsageApiV1GatewaysUsageProvidersGetQueryError =
+  HTTPValidationError;
+
+export function useGatewayProviderUsageApiV1GatewaysUsageProvidersGet<
+  TData = Awaited<
+    ReturnType<typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet>
+  >,
+  TError = HTTPValidationError,
+>(
+  params: undefined | GatewayProviderUsageApiV1GatewaysUsageProvidersGetParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet
+            >
+          >
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGatewayProviderUsageApiV1GatewaysUsageProvidersGet<
+  TData = Awaited<
+    ReturnType<typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet>
+  >,
+  TError = HTTPValidationError,
+>(
+  params?: GatewayProviderUsageApiV1GatewaysUsageProvidersGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet
+            >
+          >
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGatewayProviderUsageApiV1GatewaysUsageProvidersGet<
+  TData = Awaited<
+    ReturnType<typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet>
+  >,
+  TError = HTTPValidationError,
+>(
+  params?: GatewayProviderUsageApiV1GatewaysUsageProvidersGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Gateway Provider Usage
+ */
+
+export function useGatewayProviderUsageApiV1GatewaysUsageProvidersGet<
+  TData = Awaited<
+    ReturnType<typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet>
+  >,
+  TError = HTTPValidationError,
+>(
+  params?: GatewayProviderUsageApiV1GatewaysUsageProvidersGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof gatewayProviderUsageApiV1GatewaysUsageProvidersGet>
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getGatewayProviderUsageApiV1GatewaysUsageProvidersGetQueryOptions(
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Return daily cost and token usage from the gateway.
+
+Calls the ``usage.cost`` RPC to get aggregated daily spend data.
+Works independently of provider OAuth scopes.
+ * @summary Gateway Usage Cost
+ */
+export type gatewayUsageCostApiV1GatewaysUsageCostGetResponse200 = {
+  data: GatewayCostResponse;
+  status: 200;
+};
+
+export type gatewayUsageCostApiV1GatewaysUsageCostGetResponse422 = {
+  data: HTTPValidationError;
+  status: 422;
+};
+
+export type gatewayUsageCostApiV1GatewaysUsageCostGetResponseSuccess =
+  gatewayUsageCostApiV1GatewaysUsageCostGetResponse200 & {
+    headers: Headers;
+  };
+export type gatewayUsageCostApiV1GatewaysUsageCostGetResponseError =
+  gatewayUsageCostApiV1GatewaysUsageCostGetResponse422 & {
+    headers: Headers;
+  };
+
+export type gatewayUsageCostApiV1GatewaysUsageCostGetResponse =
+  | gatewayUsageCostApiV1GatewaysUsageCostGetResponseSuccess
+  | gatewayUsageCostApiV1GatewaysUsageCostGetResponseError;
+
+export const getGatewayUsageCostApiV1GatewaysUsageCostGetUrl = (
+  params?: GatewayUsageCostApiV1GatewaysUsageCostGetParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/gateways/usage/cost?${stringifiedParams}`
+    : `/api/v1/gateways/usage/cost`;
+};
+
+export const gatewayUsageCostApiV1GatewaysUsageCostGet = async (
+  params?: GatewayUsageCostApiV1GatewaysUsageCostGetParams,
+  options?: RequestInit,
+): Promise<gatewayUsageCostApiV1GatewaysUsageCostGetResponse> => {
+  return customFetch<gatewayUsageCostApiV1GatewaysUsageCostGetResponse>(
+    getGatewayUsageCostApiV1GatewaysUsageCostGetUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGatewayUsageCostApiV1GatewaysUsageCostGetQueryKey = (
+  params?: GatewayUsageCostApiV1GatewaysUsageCostGetParams,
+) => {
+  return [`/api/v1/gateways/usage/cost`, ...(params ? [params] : [])] as const;
+};
+
+export const getGatewayUsageCostApiV1GatewaysUsageCostGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>,
+  TError = HTTPValidationError,
+>(
+  params?: GatewayUsageCostApiV1GatewaysUsageCostGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGatewayUsageCostApiV1GatewaysUsageCostGetQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>
+  > = ({ signal }) =>
+    gatewayUsageCostApiV1GatewaysUsageCostGet(params, {
+      signal,
+      ...requestOptions,
+    });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type GatewayUsageCostApiV1GatewaysUsageCostGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>
+>;
+export type GatewayUsageCostApiV1GatewaysUsageCostGetQueryError =
+  HTTPValidationError;
+
+export function useGatewayUsageCostApiV1GatewaysUsageCostGet<
+  TData = Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>,
+  TError = HTTPValidationError,
+>(
+  params: undefined | GatewayUsageCostApiV1GatewaysUsageCostGetParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>,
+          TError,
+          Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGatewayUsageCostApiV1GatewaysUsageCostGet<
+  TData = Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>,
+  TError = HTTPValidationError,
+>(
+  params?: GatewayUsageCostApiV1GatewaysUsageCostGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>,
+          TError,
+          Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGatewayUsageCostApiV1GatewaysUsageCostGet<
+  TData = Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>,
+  TError = HTTPValidationError,
+>(
+  params?: GatewayUsageCostApiV1GatewaysUsageCostGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Gateway Usage Cost
+ */
+
+export function useGatewayUsageCostApiV1GatewaysUsageCostGet<
+  TData = Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>,
+  TError = HTTPValidationError,
+>(
+  params?: GatewayUsageCostApiV1GatewaysUsageCostGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof gatewayUsageCostApiV1GatewaysUsageCostGet>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGatewayUsageCostApiV1GatewaysUsageCostGetQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Read the current default model configuration from the gateway.
+
+Returns the primary model and fallback list from
+``agents.defaults.model`` in the gateway config.
+ * @summary Get Gateway Model Config
+ */
+export type getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetResponse200 =
+  {
+    data: GatewayModelConfig;
+    status: 200;
+  };
+
+export type getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetResponse422 =
+  {
+    data: HTTPValidationError;
+    status: 422;
+  };
+
+export type getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetResponseSuccess =
+  getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetResponse200 & {
+    headers: Headers;
+  };
+export type getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetResponseError =
+  getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetResponse422 & {
+    headers: Headers;
+  };
+
+export type getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetResponse =
+  | getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetResponseSuccess
+  | getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetResponseError;
+
+export const getGetGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetUrl =
+  (gatewayId: string) => {
+    return `/api/v1/gateways/${gatewayId}/config/models`;
+  };
+
+export const getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet =
+  async (
+    gatewayId: string,
+    options?: RequestInit,
+  ): Promise<getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetResponse> => {
+    return customFetch<getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetResponse>(
+      getGetGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetUrl(
+        gatewayId,
+      ),
+      {
+        ...options,
+        method: "GET",
+      },
+    );
+  };
+
+export const getGetGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetQueryKey =
+  (gatewayId: string) => {
+    return [`/api/v1/gateways/${gatewayId}/config/models`] as const;
+  };
+
+export const getGetGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<
+        typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+      >
+    >,
+    TError = HTTPValidationError,
+  >(
+    gatewayId: string,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+      request?: SecondParameter<typeof customFetch>;
+    },
+  ) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getGetGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetQueryKey(
+        gatewayId,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<
+          typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+        >
+      >
+    > = ({ signal }) =>
+      getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet(gatewayId, {
+        signal,
+        ...requestOptions,
+      });
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!gatewayId,
+      ...queryOptions,
+    } as UseQueryOptions<
+      Awaited<
+        ReturnType<
+          typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+        >
+      >,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type GetGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+      >
+    >
+  >;
+export type GetGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetQueryError =
+  HTTPValidationError;
+
+export function useGetGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet<
+  TData = Awaited<
+    ReturnType<
+      typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+    >
+  >,
+  TError = HTTPValidationError,
+>(
+  gatewayId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+          >
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+            >
+          >
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGetGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet<
+  TData = Awaited<
+    ReturnType<
+      typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+    >
+  >,
+  TError = HTTPValidationError,
+>(
+  gatewayId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+          >
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+            >
+          >
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGetGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet<
+  TData = Awaited<
+    ReturnType<
+      typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+    >
+  >,
+  TError = HTTPValidationError,
+>(
+  gatewayId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get Gateway Model Config
+ */
+
+export function useGetGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet<
+  TData = Awaited<
+    ReturnType<
+      typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+    >
+  >,
+  TError = HTTPValidationError,
+>(
+  gatewayId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof getGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGet
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getGetGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsGetQueryOptions(
+      gatewayId,
+      options,
+    );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Update the default model configuration on the gateway.
+
+Applies a ``config.patch`` setting ``agents.defaults.model.primary``
+and/or ``agents.defaults.model.fallbacks``.
+ * @summary Update Gateway Model Config
+ */
+export type updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchResponse200 =
+  {
+    data: GatewayModelConfig;
+    status: 200;
+  };
+
+export type updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchResponse422 =
+  {
+    data: HTTPValidationError;
+    status: 422;
+  };
+
+export type updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchResponseSuccess =
+  updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchResponse200 & {
+    headers: Headers;
+  };
+export type updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchResponseError =
+  updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchResponse422 & {
+    headers: Headers;
+  };
+
+export type updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchResponse =
+
+    | updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchResponseSuccess
+    | updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchResponseError;
+
+export const getUpdateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchUrl =
+  (gatewayId: string) => {
+    return `/api/v1/gateways/${gatewayId}/config/models`;
+  };
+
+export const updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatch =
+  async (
+    gatewayId: string,
+    gatewayModelConfigUpdate: GatewayModelConfigUpdate,
+    options?: RequestInit,
+  ): Promise<updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchResponse> => {
+    return customFetch<updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchResponse>(
+      getUpdateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchUrl(
+        gatewayId,
+      ),
+      {
+        ...options,
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...options?.headers },
+        body: JSON.stringify(gatewayModelConfigUpdate),
+      },
+    );
+  };
+
+export const getUpdateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatch
+        >
+      >,
+      TError,
+      { gatewayId: string; data: GatewayModelConfigUpdate },
+      TContext
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatch
+      >
+    >,
+    TError,
+    { gatewayId: string; data: GatewayModelConfigUpdate },
+    TContext
+  > => {
+    const mutationKey = [
+      "updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatch",
+    ];
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        "mutationKey" in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<
+          typeof updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatch
+        >
+      >,
+      { gatewayId: string; data: GatewayModelConfigUpdate }
+    > = (props) => {
+      const { gatewayId, data } = props ?? {};
+
+      return updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatch(
+        gatewayId,
+        data,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type UpdateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatch
+      >
+    >
+  >;
+export type UpdateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchMutationBody =
+  GatewayModelConfigUpdate;
+export type UpdateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Update Gateway Model Config
+ */
+export const useUpdateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatch =
+  <TError = HTTPValidationError, TContext = unknown>(
+    options?: {
+      mutation?: UseMutationOptions<
+        Awaited<
+          ReturnType<
+            typeof updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatch
+          >
+        >,
+        TError,
+        { gatewayId: string; data: GatewayModelConfigUpdate },
+        TContext
+      >;
+      request?: SecondParameter<typeof customFetch>;
+    },
+    queryClient?: QueryClient,
+  ): UseMutationResult<
+    Awaited<
+      ReturnType<
+        typeof updateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatch
+      >
+    >,
+    TError,
+    { gatewayId: string; data: GatewayModelConfigUpdate },
+    TContext
+  > => {
+    return useMutation(
+      getUpdateGatewayModelConfigApiV1GatewaysGatewayIdConfigModelsPatchMutationOptions(
+        options,
+      ),
+      queryClient,
+    );
+  };
+/**
+ * Return supported gateway protocol methods and events.
+ * @summary Gateway Commands
+ */
+export type gatewayCommandsApiV1GatewaysCommandsGetResponse200 = {
+  data: GatewayCommandsResponse;
+  status: 200;
+};
+
+export type gatewayCommandsApiV1GatewaysCommandsGetResponseSuccess =
+  gatewayCommandsApiV1GatewaysCommandsGetResponse200 & {
+    headers: Headers;
+  };
+export type gatewayCommandsApiV1GatewaysCommandsGetResponse =
+  gatewayCommandsApiV1GatewaysCommandsGetResponseSuccess;
+
+export const getGatewayCommandsApiV1GatewaysCommandsGetUrl = () => {
+  return `/api/v1/gateways/commands`;
+};
+
+export const gatewayCommandsApiV1GatewaysCommandsGet = async (
+  options?: RequestInit,
+): Promise<gatewayCommandsApiV1GatewaysCommandsGetResponse> => {
+  return customFetch<gatewayCommandsApiV1GatewaysCommandsGetResponse>(
+    getGatewayCommandsApiV1GatewaysCommandsGetUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGatewayCommandsApiV1GatewaysCommandsGetQueryKey = () => {
+  return [`/api/v1/gateways/commands`] as const;
+};
+
+export const getGatewayCommandsApiV1GatewaysCommandsGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGatewayCommandsApiV1GatewaysCommandsGetQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>
+  > = ({ signal }) =>
+    gatewayCommandsApiV1GatewaysCommandsGet({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type GatewayCommandsApiV1GatewaysCommandsGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>
+>;
+export type GatewayCommandsApiV1GatewaysCommandsGetQueryError = unknown;
+
+export function useGatewayCommandsApiV1GatewaysCommandsGet<
+  TData = Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+          TError,
+          Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGatewayCommandsApiV1GatewaysCommandsGet<
+  TData = Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+          TError,
+          Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGatewayCommandsApiV1GatewaysCommandsGet<
+  TData = Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Gateway Commands
+ */
+
+export function useGatewayCommandsApiV1GatewaysCommandsGet<
+  TData = Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof gatewayCommandsApiV1GatewaysCommandsGet>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getGatewayCommandsApiV1GatewaysCommandsGetQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * List gateways for the caller's organization.
+ * @summary List Gateways
+ */
+export type listGatewaysApiV1GatewaysGetResponse200 = {
+  data: LimitOffsetPageTypeVarCustomizedGatewayRead;
+  status: 200;
+};
+
+export type listGatewaysApiV1GatewaysGetResponse422 = {
+  data: HTTPValidationError;
+  status: 422;
+};
+
+export type listGatewaysApiV1GatewaysGetResponseSuccess =
+  listGatewaysApiV1GatewaysGetResponse200 & {
+    headers: Headers;
+  };
+export type listGatewaysApiV1GatewaysGetResponseError =
+  listGatewaysApiV1GatewaysGetResponse422 & {
+    headers: Headers;
+  };
+
+export type listGatewaysApiV1GatewaysGetResponse =
+  | listGatewaysApiV1GatewaysGetResponseSuccess
+  | listGatewaysApiV1GatewaysGetResponseError;
+
+export const getListGatewaysApiV1GatewaysGetUrl = (
+  params?: ListGatewaysApiV1GatewaysGetParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/gateways?${stringifiedParams}`
+    : `/api/v1/gateways`;
+};
+
+export const listGatewaysApiV1GatewaysGet = async (
+  params?: ListGatewaysApiV1GatewaysGetParams,
+  options?: RequestInit,
+): Promise<listGatewaysApiV1GatewaysGetResponse> => {
+  return customFetch<listGatewaysApiV1GatewaysGetResponse>(
+    getListGatewaysApiV1GatewaysGetUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListGatewaysApiV1GatewaysGetQueryKey = (
+  params?: ListGatewaysApiV1GatewaysGetParams,
+) => {
+  return [`/api/v1/gateways`, ...(params ? [params] : [])] as const;
+};
+
+export const getListGatewaysApiV1GatewaysGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
+  TError = HTTPValidationError,
+>(
+  params?: ListGatewaysApiV1GatewaysGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListGatewaysApiV1GatewaysGetQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>
+  > = ({ signal }) =>
+    listGatewaysApiV1GatewaysGet(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ListGatewaysApiV1GatewaysGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>
+>;
+export type ListGatewaysApiV1GatewaysGetQueryError = HTTPValidationError;
+
+export function useListGatewaysApiV1GatewaysGet<
+  TData = Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
+  TError = HTTPValidationError,
+>(
+  params: undefined | ListGatewaysApiV1GatewaysGetParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
+          TError,
+          Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useListGatewaysApiV1GatewaysGet<
+  TData = Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
+  TError = HTTPValidationError,
+>(
+  params?: ListGatewaysApiV1GatewaysGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
+          TError,
+          Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useListGatewaysApiV1GatewaysGet<
+  TData = Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
+  TError = HTTPValidationError,
+>(
+  params?: ListGatewaysApiV1GatewaysGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List Gateways
+ */
+
+export function useListGatewaysApiV1GatewaysGet<
+  TData = Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
+  TError = HTTPValidationError,
+>(
+  params?: ListGatewaysApiV1GatewaysGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listGatewaysApiV1GatewaysGet>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getListGatewaysApiV1GatewaysGetQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Create a gateway and provision or refresh its main agent.
+ * @summary Create Gateway
+ */
+export type createGatewayApiV1GatewaysPostResponse200 = {
+  data: GatewayRead;
+  status: 200;
+};
+
+export type createGatewayApiV1GatewaysPostResponse422 = {
+  data: HTTPValidationError;
+  status: 422;
+};
+
+export type createGatewayApiV1GatewaysPostResponseSuccess =
+  createGatewayApiV1GatewaysPostResponse200 & {
+    headers: Headers;
+  };
+export type createGatewayApiV1GatewaysPostResponseError =
+  createGatewayApiV1GatewaysPostResponse422 & {
+    headers: Headers;
+  };
+
+export type createGatewayApiV1GatewaysPostResponse =
+  | createGatewayApiV1GatewaysPostResponseSuccess
+  | createGatewayApiV1GatewaysPostResponseError;
+
+export const getCreateGatewayApiV1GatewaysPostUrl = () => {
+  return `/api/v1/gateways`;
+};
+
+export const createGatewayApiV1GatewaysPost = async (
+  gatewayCreate: GatewayCreate,
+  options?: RequestInit,
+): Promise<createGatewayApiV1GatewaysPostResponse> => {
+  return customFetch<createGatewayApiV1GatewaysPostResponse>(
+    getCreateGatewayApiV1GatewaysPostUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(gatewayCreate),
+    },
+  );
+};
+
+export const getCreateGatewayApiV1GatewaysPostMutationOptions = <
   TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteGatewayApiV1GatewaysGatewayIdDelete>>,
+    Awaited<ReturnType<typeof createGatewayApiV1GatewaysPost>>,
     TError,
-    { gatewayId: string },
+    { data: GatewayCreate },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof deleteGatewayApiV1GatewaysGatewayIdDelete>>,
+  Awaited<ReturnType<typeof createGatewayApiV1GatewaysPost>>,
   TError,
-  { gatewayId: string },
+  { data: GatewayCreate },
   TContext
 > => {
-  const mutationKey = ["deleteGatewayApiV1GatewaysGatewayIdDelete"];
+  const mutationKey = ["createGatewayApiV1GatewaysPost"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -1859,50 +3121,48 @@ export const getDeleteGatewayApiV1GatewaysGatewayIdDeleteMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof deleteGatewayApiV1GatewaysGatewayIdDelete>>,
-    { gatewayId: string }
+    Awaited<ReturnType<typeof createGatewayApiV1GatewaysPost>>,
+    { data: GatewayCreate }
   > = (props) => {
-    const { gatewayId } = props ?? {};
+    const { data } = props ?? {};
 
-    return deleteGatewayApiV1GatewaysGatewayIdDelete(gatewayId, requestOptions);
+    return createGatewayApiV1GatewaysPost(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type DeleteGatewayApiV1GatewaysGatewayIdDeleteMutationResult =
-  NonNullable<
-    Awaited<ReturnType<typeof deleteGatewayApiV1GatewaysGatewayIdDelete>>
-  >;
-
-export type DeleteGatewayApiV1GatewaysGatewayIdDeleteMutationError =
-  HTTPValidationError;
+export type CreateGatewayApiV1GatewaysPostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createGatewayApiV1GatewaysPost>>
+>;
+export type CreateGatewayApiV1GatewaysPostMutationBody = GatewayCreate;
+export type CreateGatewayApiV1GatewaysPostMutationError = HTTPValidationError;
 
 /**
- * @summary Delete Gateway
+ * @summary Create Gateway
  */
-export const useDeleteGatewayApiV1GatewaysGatewayIdDelete = <
+export const useCreateGatewayApiV1GatewaysPost = <
   TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof deleteGatewayApiV1GatewaysGatewayIdDelete>>,
+      Awaited<ReturnType<typeof createGatewayApiV1GatewaysPost>>,
       TError,
-      { gatewayId: string },
+      { data: GatewayCreate },
       TContext
     >;
     request?: SecondParameter<typeof customFetch>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof deleteGatewayApiV1GatewaysGatewayIdDelete>>,
+  Awaited<ReturnType<typeof createGatewayApiV1GatewaysPost>>,
   TError,
-  { gatewayId: string },
+  { data: GatewayCreate },
   TContext
 > => {
   return useMutation(
-    getDeleteGatewayApiV1GatewaysGatewayIdDeleteMutationOptions(options),
+    getCreateGatewayApiV1GatewaysPostMutationOptions(options),
     queryClient,
   );
 };
@@ -2243,6 +3503,126 @@ export const useUpdateGatewayApiV1GatewaysGatewayIdPatch = <
   );
 };
 /**
+ * Delete a gateway in the caller's organization.
+ * @summary Delete Gateway
+ */
+export type deleteGatewayApiV1GatewaysGatewayIdDeleteResponse200 = {
+  data: OkResponse;
+  status: 200;
+};
+
+export type deleteGatewayApiV1GatewaysGatewayIdDeleteResponse422 = {
+  data: HTTPValidationError;
+  status: 422;
+};
+
+export type deleteGatewayApiV1GatewaysGatewayIdDeleteResponseSuccess =
+  deleteGatewayApiV1GatewaysGatewayIdDeleteResponse200 & {
+    headers: Headers;
+  };
+export type deleteGatewayApiV1GatewaysGatewayIdDeleteResponseError =
+  deleteGatewayApiV1GatewaysGatewayIdDeleteResponse422 & {
+    headers: Headers;
+  };
+
+export type deleteGatewayApiV1GatewaysGatewayIdDeleteResponse =
+  | deleteGatewayApiV1GatewaysGatewayIdDeleteResponseSuccess
+  | deleteGatewayApiV1GatewaysGatewayIdDeleteResponseError;
+
+export const getDeleteGatewayApiV1GatewaysGatewayIdDeleteUrl = (
+  gatewayId: string,
+) => {
+  return `/api/v1/gateways/${gatewayId}`;
+};
+
+export const deleteGatewayApiV1GatewaysGatewayIdDelete = async (
+  gatewayId: string,
+  options?: RequestInit,
+): Promise<deleteGatewayApiV1GatewaysGatewayIdDeleteResponse> => {
+  return customFetch<deleteGatewayApiV1GatewaysGatewayIdDeleteResponse>(
+    getDeleteGatewayApiV1GatewaysGatewayIdDeleteUrl(gatewayId),
+    {
+      ...options,
+      method: "DELETE",
+    },
+  );
+};
+
+export const getDeleteGatewayApiV1GatewaysGatewayIdDeleteMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteGatewayApiV1GatewaysGatewayIdDelete>>,
+    TError,
+    { gatewayId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteGatewayApiV1GatewaysGatewayIdDelete>>,
+  TError,
+  { gatewayId: string },
+  TContext
+> => {
+  const mutationKey = ["deleteGatewayApiV1GatewaysGatewayIdDelete"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteGatewayApiV1GatewaysGatewayIdDelete>>,
+    { gatewayId: string }
+  > = (props) => {
+    const { gatewayId } = props ?? {};
+
+    return deleteGatewayApiV1GatewaysGatewayIdDelete(gatewayId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteGatewayApiV1GatewaysGatewayIdDeleteMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof deleteGatewayApiV1GatewaysGatewayIdDelete>>
+  >;
+
+export type DeleteGatewayApiV1GatewaysGatewayIdDeleteMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Delete Gateway
+ */
+export const useDeleteGatewayApiV1GatewaysGatewayIdDelete = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deleteGatewayApiV1GatewaysGatewayIdDelete>>,
+      TError,
+      { gatewayId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof deleteGatewayApiV1GatewaysGatewayIdDelete>>,
+  TError,
+  { gatewayId: string },
+  TContext
+> => {
+  return useMutation(
+    getDeleteGatewayApiV1GatewaysGatewayIdDeleteMutationOptions(options),
+    queryClient,
+  );
+};
+/**
  * Sync templates for a gateway and optionally rotate runtime settings.
  * @summary Sync Gateway Templates
  */
@@ -2432,71 +3812,3 @@ export const useSyncGatewayTemplatesApiV1GatewaysGatewayIdTemplatesSyncPost = <
     queryClient,
   );
 };
-
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Gateway models list — GET /api/v1/gateways/models
-// ---------------------------------------------------------------------------
-
-export type gatewayModelsApiV1GatewaysModelsGetResponse200 = {
-  status: 200;
-  data: { models: object[]; error?: string | null };
-};
-
-export type gatewayModelsApiV1GatewaysModelsGetResponse =
-  gatewayModelsApiV1GatewaysModelsGetResponse200;
-
-export const getGatewayModelsApiV1GatewaysModelsGetUrl = (
-  params?: { board_id?: string | null },
-) => {
-  const normalizedParams = new URLSearchParams();
-  if (params?.board_id) normalizedParams.append("board_id", params.board_id);
-  const s = normalizedParams.toString();
-  return s.length > 0 ? `/api/v1/gateways/models?${s}` : `/api/v1/gateways/models`;
-};
-
-export const gatewayModelsApiV1GatewaysModelsGet = async (
-  params?: { board_id?: string | null },
-  options?: RequestInit,
-): Promise<gatewayModelsApiV1GatewaysModelsGetResponse> => {
-  return customFetch<gatewayModelsApiV1GatewaysModelsGetResponse>(
-    getGatewayModelsApiV1GatewaysModelsGetUrl(params),
-    { ...options, method: "GET" },
-  );
-};
-
-export const getGatewayModelsApiV1GatewaysModelsGetQueryKey = (
-  params?: { board_id?: string | null },
-) => {
-  return [`/api/v1/gateways/models`, ...(params ? [params] : [])] as const;
-};
-
-export function useGatewayModelsApiV1GatewaysModelsGet<
-  TData = Awaited<ReturnType<typeof gatewayModelsApiV1GatewaysModelsGet>>,
-  TError = unknown,
->(
-  params?: { board_id?: string | null },
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof gatewayModelsApiV1GatewaysModelsGet>>,
-        TError,
-        TData
-      >
-    >;
-  },
-) {
-  const { query: queryOptions } = options ?? {};
-  const queryKey =
-    queryOptions?.queryKey ??
-    getGatewayModelsApiV1GatewaysModelsGetQueryKey(params);
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof gatewayModelsApiV1GatewaysModelsGet>>
-  > = () => gatewayModelsApiV1GatewaysModelsGet(params);
-  return useQuery<
-    Awaited<ReturnType<typeof gatewayModelsApiV1GatewaysModelsGet>>,
-    TError,
-    TData
-  >({ queryKey, queryFn, ...queryOptions });
-}
