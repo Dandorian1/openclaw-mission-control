@@ -2783,6 +2783,32 @@ ALLOWED_MIMETYPES = {
     "video/webm",
 }
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB per file
+
+# Magic byte signatures for server-side content validation.
+# Maps detected MIME type to the magic byte prefix(es) that identify it.
+_MAGIC_SIGNATURES: list[tuple[str, bytes, int]] = [
+    # (mime_type, signature_bytes, offset)
+    ("image/png", b"\x89PNG\r\n\x1a\n", 0),
+    ("image/jpeg", b"\xff\xd8\xff", 0),
+    ("image/gif", b"GIF87a", 0),
+    ("image/gif", b"GIF89a", 0),
+    ("image/webp", b"RIFF", 0),  # RIFF header; bytes 8-11 must be "WEBP"
+    ("video/mp4", b"ftyp", 4),  # MP4 ftyp box at offset 4
+    ("video/quicktime", b"ftyp", 4),  # QuickTime also uses ftyp
+    ("video/webm", b"\x1a\x45\xdf\xa3", 0),  # EBML header (Matroska/WebM)
+]
+
+
+def _detect_mime_from_magic(content: bytes) -> str | None:
+    """Detect MIME type from file magic bytes. Returns None if unrecognized."""
+    for mime, sig, offset in _MAGIC_SIGNATURES:
+        end = offset + len(sig)
+        if len(content) >= end and content[offset:end] == sig:
+            # Extra check for WebP: bytes 8-11 must be "WEBP"
+            if mime == "image/webp" and (len(content) < 12 or content[8:12] != b"WEBP"):
+                continue
+            return mime
+    return None
 MAX_TASK_ATTACHMENTS_SIZE = 10 * 1024 * 1024  # 10 MB per task
 
 
@@ -2820,6 +2846,24 @@ async def upload_task_attachment(
     # Read file content and check size
     content = await file.read()
     file_size = len(content)
+
+    # Server-side magic-byte validation: don't trust client Content-Type
+    detected_mime = _detect_mime_from_magic(content)
+    if detected_mime is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File content does not match any allowed type. "
+            f"Allowed: {', '.join(sorted(ALLOWED_MIMETYPES))}",
+        )
+    if detected_mime not in ALLOWED_MIMETYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Detected file type '{detected_mime}' not allowed. "
+            f"Allowed: {', '.join(sorted(ALLOWED_MIMETYPES))}",
+        )
+    # Use the detected MIME type instead of the client-provided one
+    content_type = detected_mime
+
     if file_size > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
