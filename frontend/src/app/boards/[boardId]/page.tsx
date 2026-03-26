@@ -14,6 +14,7 @@ import { SignInButton, SignedIn, SignedOut, useAuth } from "@/auth/clerk";
 import {
   Activity,
   ArrowUpRight,
+  Download,
   FileUp,
   ImageIcon,
   MessageSquare,
@@ -956,6 +957,12 @@ export default function BoardDetailPage() {
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [attachmentBlobUrls, setAttachmentBlobUrls] = useState<Record<string, string>>({});
+  const [lightboxMedia, setLightboxMedia] = useState<{
+    url: string;
+    filename: string;
+    mimetype: string;
+    attachmentId: string;
+  } | null>(null);
 
   /** Fetch an attachment via authenticated request and return a blob URL. */
   const getAuthenticatedBlobUrl = useCallback(
@@ -4260,8 +4267,9 @@ export default function BoardDetailPage() {
                         {isImage && blobUrl ? (
                           <button
                             type="button"
-                            onClick={() => void handleDownloadAttachment(att.id, att.filename)}
+                            onClick={() => setLightboxMedia({ url: blobUrl, filename: att.filename, mimetype: att.mimetype, attachmentId: att.id })}
                             className="block w-full cursor-pointer"
+                            title="Click to enlarge"
                           >
                             <img
                               src={blobUrl}
@@ -4270,13 +4278,19 @@ export default function BoardDetailPage() {
                             />
                           </button>
                         ) : isVideo && blobUrl ? (
-                          <video
-                            controls
-                            className="mb-2 max-h-48 w-full rounded-md"
-                            preload="metadata"
+                          <button
+                            type="button"
+                            onClick={() => setLightboxMedia({ url: blobUrl, filename: att.filename, mimetype: att.mimetype, attachmentId: att.id })}
+                            className="block w-full cursor-pointer"
+                            title="Click to enlarge"
                           >
-                            <source src={blobUrl} type={att.mimetype} />
-                          </video>
+                            <video
+                              className="mb-2 max-h-48 w-full rounded-md pointer-events-none"
+                              preload="metadata"
+                            >
+                              <source src={blobUrl} type={att.mimetype} />
+                            </video>
+                          </button>
                         ) : (isImage || isVideo) && !blobUrl ? (
                           <div className="mb-2 flex h-24 items-center justify-center rounded-md bg-muted/30">
                             <span className="text-xs text-muted">Loading preview…</span>
@@ -5127,6 +5141,65 @@ export default function BoardDetailPage() {
       ) : null}
 
       {/* onboarding moved to board settings */}
+
+      {/* Lightbox overlay for image/video enlargement */}
+      {lightboxMedia ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setLightboxMedia(null)}
+          onKeyDown={(e) => { if (e.key === "Escape") setLightboxMedia(null); }}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Preview: ${lightboxMedia.filename}`}
+          tabIndex={-1}
+          ref={(el) => el?.focus()}
+        >
+          {/* Top-right controls */}
+          <div className="absolute right-4 top-4 flex items-center gap-2 z-[101]">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                void handleDownloadAttachment(lightboxMedia.attachmentId, lightboxMedia.filename);
+              }}
+              className="rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
+              title="Download"
+            >
+              <Download className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setLightboxMedia(null)}
+              className="rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
+              title="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          {/* Media content */}
+          <div className="max-h-[90vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+            {lightboxMedia.mimetype.startsWith("image/") ? (
+              <img
+                src={lightboxMedia.url}
+                alt={lightboxMedia.filename}
+                className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
+              />
+            ) : lightboxMedia.mimetype.startsWith("video/") ? (
+              <video
+                controls
+                autoPlay
+                className="max-h-[90vh] max-w-[90vw] rounded-lg"
+              >
+                <source src={lightboxMedia.url} type={lightboxMedia.mimetype} />
+              </video>
+            ) : null}
+          </div>
+          {/* Filename label */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-4 py-1.5 text-sm text-white/80">
+            {lightboxMedia.filename}
+          </div>
+        </div>
+      ) : null}
     </DashboardShell>
   );
 }

@@ -29,3 +29,4 @@ backend/coverage.*
 backend/.coverage
 frontend/coverage
 backend/app/services/openclaw/.device-keysbackend/.env.bak.*
+backend/.env.bak*
