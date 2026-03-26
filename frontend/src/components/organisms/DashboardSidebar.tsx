@@ -16,6 +16,7 @@ import {
   Settings,
   Store,
   Tags,
+  Users,
 } from "lucide-react";
 
 import { useAuth } from "@/auth/clerk";
@@ -25,6 +26,10 @@ import {
   type healthzHealthzGetResponse,
   useHealthzHealthzGet,
 } from "@/api/generated/default/default";
+import {
+  type listBoardsApiV1BoardsGetResponse,
+  useListBoardsApiV1BoardsGet,
+} from "@/api/generated/boards/boards";
 import { cn } from "@/lib/utils";
 
 export function DashboardSidebar() {
@@ -41,6 +46,12 @@ export function DashboardSidebar() {
       request: { cache: "no-store" },
     },
   );
+
+  const boardsQuery = useListBoardsApiV1BoardsGet<listBoardsApiV1BoardsGetResponse>(
+    undefined,
+    { query: { enabled: Boolean(isSignedIn), staleTime: 60_000 } },
+  );
+  const boards = boardsQuery.data?.status === 200 ? boardsQuery.data.data.items : [];
 
   const okValue = healthQuery.data?.data?.ok;
   const systemStatus: "unknown" | "operational" | "degraded" =
@@ -105,6 +116,51 @@ export function DashboardSidebar() {
               >
                 <Gauge className="h-4 w-4" />
                 AI Usage
+              </Link>
+            </div>
+          </div>
+
+          {boards.length > 0 ? (
+            <div>
+              <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-quiet">
+                Team
+              </p>
+              <div className="mt-1 space-y-1">
+                {boards.map((b: { id: string; name: string }) => (
+                  <Link
+                    key={b.id}
+                    href={`/team/${b.id}`}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-strong transition",
+                      pathname === `/team/${b.id}`
+                        ? "bg-[color:var(--accent-soft)] text-[color:var(--accent)] font-medium"
+                        : "hover:bg-[color:var(--surface-strong)]",
+                    )}
+                  >
+                    <Users className="h-4 w-4" />
+                    {b.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div>
+            <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-quiet">
+              Team
+            </p>
+            <div className="mt-1 space-y-1">
+              <Link
+                href="/office"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-strong transition",
+                  pathname.startsWith("/office")
+                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent)] font-medium"
+                    : "hover:bg-[color:var(--surface-strong)]",
+                )}
+              >
+                <Building2 className="h-4 w-4" />
+                Office
               </Link>
             </div>
           </div>
