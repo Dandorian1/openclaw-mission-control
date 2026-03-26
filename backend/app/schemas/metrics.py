@@ -28,6 +28,7 @@ class DashboardWipPoint(SQLModel):
     in_progress: int
     review: int
     done: int
+    wont_do: int
 
 
 class DashboardRangeSeries(SQLModel):
@@ -69,6 +70,7 @@ class DashboardKpis(SQLModel):
     in_progress_tasks: int
     review_tasks: int
     done_tasks: int
+    wont_do_tasks: int
     error_rate_pct: float
     median_cycle_time_hours_7d: float | None
 

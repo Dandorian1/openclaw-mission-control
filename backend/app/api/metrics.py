@@ -155,6 +155,7 @@ def _wip_series_from_mapping(
                 in_progress=values.get("in_progress", 0),
                 review=values.get("review", 0),
                 done=values.get("done", 0),
+                wont_do=values.get("wont_do", 0),
             ),
         )
     return DashboardWipRangeSeries(
@@ -272,12 +273,14 @@ async def _query_wip(
     progress_case = case((col(Task.status) == "in_progress", 1), else_=0)
     review_case = case((col(Task.status) == "review", 1), else_=0)
     done_case = case((col(Task.status) == "done", 1), else_=0)
+    wont_do_case = case((col(Task.status) == "wont_do", 1), else_=0)
     status_statement = (
         select(
             status_bucket_col,
             func.sum(progress_case),
             func.sum(review_case),
             func.sum(done_case),
+            func.sum(wont_do_case),
         )
         .where(col(Task.updated_at) >= range_spec.start)
         .where(col(Task.updated_at) <= range_spec.end)
@@ -291,11 +294,12 @@ async def _query_wip(
     for bucket, inbox in inbox_results:
         values = mapping.setdefault(bucket, {})
         values["inbox"] = int(inbox or 0)
-    for bucket, in_progress, review, done in status_results:
+    for bucket, in_progress, review, done, wont_do in status_results:
         values = mapping.setdefault(bucket, {})
         values["in_progress"] = int(in_progress or 0)
         values["review"] = int(review or 0)
         values["done"] = int(done or 0)
+        values["wont_do"] = int(wont_do or 0)
     return _wip_series_from_mapping(range_spec, mapping)
 
 
@@ -383,6 +387,7 @@ async def _task_status_counts(
             "in_progress": 0,
             "review": 0,
             "done": 0,
+            "wont_do": 0,
         }
     statement = (
         select(col(Task.status), func.count())
@@ -395,6 +400,7 @@ async def _task_status_counts(
         "in_progress": 0,
         "review": 0,
         "done": 0,
+        "wont_do": 0,
     }
     for status_value, total in results:
         key = str(status_value)
@@ -531,6 +537,7 @@ async def dashboard_metrics(
         in_progress_tasks=task_status_counts["in_progress"],
         review_tasks=task_status_counts["review"],
         done_tasks=task_status_counts["done"],
+        wont_do_tasks=task_status_counts["wont_do"],
         error_rate_pct=await _error_rate_kpi(session, primary, board_ids),
         median_cycle_time_hours_7d=await _median_cycle_time_for_range(
             session,

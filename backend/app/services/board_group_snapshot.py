@@ -26,7 +26,7 @@ from app.services.tags import TagState, load_tag_state
 if TYPE_CHECKING:
     from sqlalchemy.sql.elements import ColumnElement
 
-_STATUS_ORDER = {"in_progress": 0, "review": 1, "inbox": 2, "done": 3}
+_STATUS_ORDER = {"in_progress": 0, "review": 1, "inbox": 2, "done": 3, "wont_do": 4}
 _PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 _RUNTIME_TYPE_REFERENCES = (UUID, AsyncSession)
 
@@ -88,7 +88,7 @@ async def _ordered_tasks_for_boards(
     """Return sorted tasks for boards, optionally excluding completed tasks."""
     task_statement = select(Task).where(col(Task.board_id).in_(board_ids))
     if not include_done:
-        task_statement = task_statement.where(col(Task.status) != "done")
+        task_statement = task_statement.where(col(Task.status).not_in(("done", "wont_do")))
     task_statement = task_statement.order_by(
         col(Task.board_id).asc(),
         _status_weight_expr().asc(),

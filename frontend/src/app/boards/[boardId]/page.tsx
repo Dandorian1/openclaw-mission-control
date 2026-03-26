@@ -532,6 +532,7 @@ const statusOptions = [
   { value: "in_progress", label: "In progress" },
   { value: "review", label: "Review" },
   { value: "done", label: "Done" },
+  { value: "wont_do", label: "Won't do" },
 ];
 
 const SSE_RECONNECT_BACKOFF = {
@@ -1274,7 +1275,7 @@ export default function BoardDetailPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState("medium");
+  const [priority, setPriority] = useState<"critical" | "high" | "medium" | "low">("medium");
   const [createDueDate, setCreateDueDate] = useState("");
   const [createTagIds, setCreateTagIds] = useState<string[]>([]);
   const [createCustomFieldValues, setCreateCustomFieldValues] =
@@ -1285,7 +1286,7 @@ export default function BoardDetailPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editStatus, setEditStatus] = useState<TaskStatus>("inbox");
-  const [editPriority, setEditPriority] = useState("medium");
+  const [editPriority, setEditPriority] = useState<"critical" | "high" | "medium" | "low">("medium");
   const [editDueDate, setEditDueDate] = useState("");
   const [editAssigneeId, setEditAssigneeId] = useState("");
   const [editTagIds, setEditTagIds] = useState<string[]>([]);
@@ -1803,7 +1804,7 @@ export default function BoardDetailPage() {
     setEditTitle(selectedTask.title);
     setEditDescription(selectedTask.description ?? "");
     setEditStatus(selectedTask.status);
-    setEditPriority(selectedTask.priority);
+    setEditPriority((selectedTask.priority ?? "medium") as "critical" | "high" | "medium" | "low");
     setEditDueDate(toLocalDateInput(selectedTask.due_at));
     setEditAssigneeId(selectedTask.assigned_agent_id ?? "");
     setEditTagIds(selectedTask.tag_ids ?? []);
@@ -3026,7 +3027,7 @@ export default function BoardDetailPage() {
     setEditTitle(selectedTask.title);
     setEditDescription(selectedTask.description ?? "");
     setEditStatus(selectedTask.status);
-    setEditPriority(selectedTask.priority);
+    setEditPriority((selectedTask.priority ?? "medium") as "critical" | "high" | "medium" | "low");
     setEditDueDate(toLocalDateInput(selectedTask.due_at));
     setEditAssigneeId(selectedTask.assigned_agent_id ?? "");
     setEditTagIds(selectedTask.tag_ids ?? []);
@@ -3199,6 +3200,8 @@ export default function BoardDetailPage() {
         return "bg-indigo-100 text-indigo-700";
       case "done":
         return "bg-emerald-100 text-emerald-700";
+      case "wont_do":
+        return "bg-gray-100 text-gray-500";
       default:
         return "bg-[color:var(--surface-strong)] text-muted";
     }
@@ -4610,7 +4613,7 @@ export default function BoardDetailPage() {
                 </label>
                 <Select
                   value={editPriority}
-                  onValueChange={setEditPriority}
+                  onValueChange={(v) => setEditPriority(v as "critical" | "high" | "medium" | "low")}
                   disabled={!selectedTask || isSavingTask || !canWrite}
                 >
                   <SelectTrigger>
@@ -4924,7 +4927,7 @@ export default function BoardDetailPage() {
               </label>
               <Select
                 value={priority}
-                onValueChange={setPriority}
+                onValueChange={(v) => setPriority(v as "critical" | "high" | "medium" | "low")}
                 disabled={!canWrite || isCreating}
               >
                 <SelectTrigger>

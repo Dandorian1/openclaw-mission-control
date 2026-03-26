@@ -13,7 +13,7 @@ import { TaskCard } from "@/components/molecules/TaskCard";
 import { parseApiDatetime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
-type TaskStatus = "inbox" | "in_progress" | "review" | "done";
+type TaskStatus = "inbox" | "in_progress" | "review" | "done" | "wont_do";
 
 type Task = {
   id: string;
@@ -80,6 +80,14 @@ const columns: Array<{
     text: "group-hover:text-green-600 text-muted",
     badge: "bg-emerald-100 text-emerald-700",
   },
+  {
+    title: "Won't Do",
+    status: "wont_do",
+    dot: "bg-gray-400",
+    accent: "hover:border-gray-300 hover:bg-gray-50",
+    text: "group-hover:text-gray-500 text-muted",
+    badge: "bg-gray-100 text-gray-500",
+  },
 ];
 
 /**
@@ -101,7 +109,7 @@ const resolveDueState = (
     day: "numeric",
   });
 
-  const isOverdue = task.status !== "done" && date.getTime() < Date.now();
+  const isOverdue = task.status !== "done" && task.status !== "wont_do" && date.getTime() < Date.now();
   return {
     due: isOverdue ? `Overdue · ${dueLabel}` : dueLabel,
     isOverdue,
@@ -291,6 +299,7 @@ export const TaskBoard = memo(function TaskBoard({
       in_progress: [],
       review: [],
       done: [],
+      wont_do: [],
     };
     for (const column of columns) {
       buckets[column.status] = [];

@@ -15,6 +15,7 @@ export interface DashboardKpis {
   in_progress_tasks: number;
   review_tasks: number;
   done_tasks: number;
+  wont_do_tasks: number;
   error_rate_pct: number;
   median_cycle_time_hours_7d: number | null;
 }

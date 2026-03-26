@@ -12,7 +12,7 @@ import type { TaskUpdateCustomFieldValues } from "./taskUpdateCustomFieldValues"
 export interface TaskUpdate {
   title?: string | null;
   description?: string | null;
-  status?: "inbox" | "in_progress" | "review" | "done" | null;
+  status?: "inbox" | "in_progress" | "review" | "done" | "wont_do" | null;
   priority?: "critical" | "high" | "medium" | "low" | null;
   due_at?: string | null;
   assigned_agent_id?: string | null;

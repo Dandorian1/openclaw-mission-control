@@ -13,4 +13,5 @@ export const TaskReadStatus = {
   in_progress: "in_progress",
   review: "review",
   done: "done",
+  wont_do: "wont_do",
 } as const;

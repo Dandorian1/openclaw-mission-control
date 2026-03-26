@@ -3812,3 +3812,32 @@ export const useSyncGatewayTemplatesApiV1GatewaysGatewayIdTemplatesSyncPost = <
     queryClient,
   );
 };
+
+// ─── Stubs for removed gateway models endpoint ─────────────────────────
+// The /api/v1/gateways/models endpoint was removed but these symbols are
+// still imported by gateways/[gatewayId]/page.tsx and agents/[agentId]/edit/page.tsx.
+// Returning empty data so pages render without crashing.
+
+export type gatewayModelsApiV1GatewaysModelsGetResponse = {
+  status: 200;
+  data: { models: never[] };
+};
+
+export const gatewayModelsApiV1GatewaysModelsGet = async (
+  _params?: { board_id?: string } | undefined,
+): Promise<gatewayModelsApiV1GatewaysModelsGetResponse> => {
+  return { status: 200, data: { models: [] } };
+};
+
+export function useGatewayModelsApiV1GatewaysModelsGet<
+  TData = Awaited<ReturnType<typeof gatewayModelsApiV1GatewaysModelsGet>>,
+>(
+  params?: { board_id?: string } | undefined,
+  options?: { query?: { enabled?: boolean; retry?: boolean } },
+) {
+  return useQuery({
+    queryKey: ["gateways", "models", params],
+    queryFn: () => gatewayModelsApiV1GatewaysModelsGet(params),
+    ...options?.query,
+  });
+}

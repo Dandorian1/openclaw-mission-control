@@ -59,6 +59,8 @@ const statusLabel = (value?: string | null) => {
       return "Review";
     case "done":
       return "Done";
+    case "wont_do":
+      return "Won't do";
     default:
       return value || "—";
   }
@@ -72,6 +74,8 @@ const statusTone = (value?: string | null) => {
       return "bg-amber-50 text-amber-800 border-amber-200";
     case "done":
       return "bg-[color:var(--surface-muted)] text-muted border-[color:var(--border)]";
+    case "wont_do":
+      return "bg-gray-50 text-gray-500 border-gray-200";
     default:
       return "bg-blue-50 text-blue-700 border-blue-200";
   }

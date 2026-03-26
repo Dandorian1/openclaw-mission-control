@@ -92,7 +92,7 @@ if TYPE_CHECKING:
 
 router = APIRouter(prefix="/boards/{board_id}/tasks", tags=["tasks"])
 
-ALLOWED_STATUSES = {"inbox", "in_progress", "review", "done"}
+ALLOWED_STATUSES = {"inbox", "in_progress", "review", "done", "wont_do"}
 TASK_EVENT_TYPES = {
     "task.created",
     "task.updated",
@@ -1241,7 +1241,7 @@ async def _task_read_page(
             dependency_ids=dep_list,
             status_by_id=dep_status,
         )
-        if task.status == "done":
+        if task.status in ("done", "wont_do"):
             blocked_by = []
         output.append(
             TaskRead.model_validate(task, from_attributes=True).model_copy(
@@ -1333,7 +1333,7 @@ def _task_event_payload(
         dependency_ids=dep_list,
         status_by_id=dep_status,
     )
-    if task.status == "done":
+    if task.status in ("done", "wont_do"):
         blocked_by = []
     payload["task"] = (
         TaskRead.model_validate(task, from_attributes=True)
@@ -1937,7 +1937,7 @@ async def _task_read_response(
         board_id=board_id,
         task_ids=[task.id],
     )
-    if task.status == "done":
+    if task.status in ("done", "wont_do"):
         blocked_ids = []
     return TaskRead.model_validate(task, from_attributes=True).model_copy(
         update={
@@ -2017,7 +2017,7 @@ async def _lead_effective_dependencies(
     # to the task's current dependencies for blocked-by evaluation.
     normalized_deps: list[UUID] | None = None
     if update.depends_on_task_ids is not None:
-        if update.task.status == "done":
+        if update.task.status in ("done", "wont_do"):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=("Cannot change task dependencies after a task is done."),
@@ -2131,9 +2131,10 @@ async def _board_has_workers(session: AsyncSession, *, board_id: UUID) -> bool:
 
 # Valid status transitions when a lead acts as a solo worker (no workers on board).
 _LEAD_SOLO_VALID_TRANSITIONS: dict[str, set[str]] = {
-    "inbox": {"in_progress"},
-    "in_progress": {"review", "inbox"},
-    "review": {"done", "inbox"},
+    "inbox": {"in_progress", "wont_do"},
+    "in_progress": {"review", "inbox", "wont_do"},
+    "review": {"done", "inbox", "wont_do"},
+    "wont_do": {"inbox"},
 }
 
 
@@ -2186,12 +2187,12 @@ async def _lead_apply_status(
                 f"task status is `review` (current: `{update.task.status}`)."
             ),
         )
-    if target_status not in {"done", "inbox"}:
+    if target_status not in {"done", "inbox", "wont_do"}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(
-                "Lead status target gate failed: review tasks can only move to `done` or "
-                f"`inbox` (requested: `{target_status}`)."
+                "Lead status target gate failed: review tasks can only move to `done`, "
+                f"`inbox`, or `wont_do` (requested: `{target_status}`)."
             ),
         )
     if target_status == "inbox":
@@ -2201,6 +2202,9 @@ async def _lead_apply_status(
             board_id=update.board_id,
             lead_agent_id=lead_agent.id,
         )
+        update.task.in_progress_at = None
+    elif target_status == "wont_do":
+        update.task.assigned_agent_id = None
         update.task.in_progress_at = None
     update.task.status = target_status
 
@@ -2404,7 +2408,7 @@ async def _apply_non_lead_agent_task_rules(
                 detail="Only board leads can change task status.",
             )
         status_value = _required_status_value(update.updates["status"])
-        if status_value != "inbox":
+        if status_value not in ("inbox", "wont_do"):
             dep_ids = await _task_dep_ids(
                 session,
                 board_id=update.board_id,
@@ -2420,6 +2424,10 @@ async def _apply_non_lead_agent_task_rules(
         if status_value == "inbox":
             update.task.assigned_agent_id = None
             update.task.previous_in_progress_at = update.task.in_progress_at
+            update.task.in_progress_at = None
+        elif status_value == "wont_do":
+            update.task.previous_in_progress_at = update.task.in_progress_at
+            update.task.assigned_agent_id = None
             update.task.in_progress_at = None
         elif status_value == "review":
             update.task.previous_in_progress_at = update.task.in_progress_at
@@ -2442,7 +2450,7 @@ async def _apply_admin_task_rules(
         update=update,
     )
     if update.depends_on_task_ids is not None:
-        if update.task.status == "done":
+        if update.task.status in ("done", "wont_do"):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=("Cannot change task dependencies after a task is done."),
@@ -2471,9 +2479,10 @@ async def _apply_admin_task_rules(
     target_status = _required_status_value(
         update.updates.get("status", update.task.status),
     )
-    # Reset blocked tasks to inbox unless the task is already done and remains
-    # done, which is the explicit done-task exception.
-    if blocked_ids and not (update.task.status == "done" and target_status == "done"):
+    # Reset blocked tasks to inbox unless the task is already in a terminal
+    # state and remains there, which is the explicit done/wont_do exception.
+    _terminal = ("done", "wont_do")
+    if blocked_ids and not (update.task.status in _terminal and target_status in _terminal):
         update.task.status = "inbox"
         update.task.assigned_agent_id = None
         update.task.in_progress_at = None
@@ -2486,7 +2495,7 @@ async def _apply_admin_task_rules(
             update.task.previous_in_progress_at = update.task.in_progress_at
             update.task.assigned_agent_id = None
             update.task.in_progress_at = None
-        elif status_value == "review":
+        elif status_value in ("review", "wont_do"):
             update.task.previous_in_progress_at = update.task.in_progress_at
             update.task.assigned_agent_id = None
             update.task.in_progress_at = None

@@ -14,4 +14,5 @@ export interface DashboardWipPoint {
   in_progress: number;
   review: number;
   done: number;
+  wont_do: number;
 }

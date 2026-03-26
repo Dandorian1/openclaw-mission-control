@@ -801,9 +801,10 @@ export default function DashboardPage() {
   const inProgressTasksMetric = metrics?.kpis.in_progress_tasks ?? 0;
   const reviewTasksMetric = metrics?.kpis.review_tasks ?? 0;
   const doneTasksMetric = metrics?.kpis.done_tasks ?? 0;
+  const wontDoTasksMetric = metrics?.kpis.wont_do_tasks ?? 0;
 
   const activeAgentsMetric = onlineAgents;
-  const tasksTotal = inboxTasksMetric + inProgressTasksMetric + reviewTasksMetric + doneTasksMetric;
+  const tasksTotal = inboxTasksMetric + inProgressTasksMetric + reviewTasksMetric + doneTasksMetric + wontDoTasksMetric;
   const tasksInProgressMetric = metrics?.kpis.tasks_in_progress ?? inProgressTasksMetric;
   const errorRateMetric = Number(metrics?.kpis.error_rate_pct ?? 0);
   const reviewBacklogRatio =
