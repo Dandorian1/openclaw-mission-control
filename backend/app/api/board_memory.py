@@ -279,6 +279,9 @@ async def create_board_memory(
     actor: ActorContext = ACTOR_DEP,
 ) -> BoardMemory:
     """Create a board memory entry and notify chat targets when needed."""
+    from app.core.sanitize import sanitize_markdown
+
+    payload.content = sanitize_markdown(payload.content)
     is_chat = payload.tags is not None and "chat" in payload.tags
     source = payload.source
     if is_chat and not source:

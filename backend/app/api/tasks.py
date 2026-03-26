@@ -1456,6 +1456,12 @@ async def create_task(
     auth: AuthContext = USER_AUTH_DEP,
 ) -> TaskRead:
     """Create a task and initialize dependency rows."""
+    from app.core.sanitize import sanitize_markdown
+
+    if payload.title:
+        payload.title = sanitize_markdown(payload.title)
+    if payload.description:
+        payload.description = sanitize_markdown(payload.description)
     data = payload.model_dump(exclude={"depends_on_task_ids", "tag_ids", "custom_field_values"})
     depends_on_task_ids = list(payload.depends_on_task_ids)
     tag_ids = list(payload.tag_ids)
@@ -1552,6 +1558,12 @@ async def update_task(
     actor: ActorContext = ACTOR_DEP,
 ) -> TaskRead:
     """Update task status, assignment, comment, and dependency state."""
+    from app.core.sanitize import sanitize_markdown
+
+    if payload.title is not None:
+        payload.title = sanitize_markdown(payload.title)
+    if payload.description is not None:
+        payload.description = sanitize_markdown(payload.description)
     if task.board_id is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -2747,10 +2759,13 @@ async def create_task_comment(
     actor: ActorContext = ACTOR_DEP,
 ) -> ActivityEvent:
     """Create a task comment and notify relevant agents."""
+    from app.core.sanitize import sanitize_markdown
+
     await _validate_task_comment_access(session, task=task, actor=actor)
+    sanitized_message = sanitize_markdown(payload.message)
     event = ActivityEvent(
         event_type="task.comment",
-        message=payload.message,
+        message=sanitized_message,
         task_id=task.id,
         board_id=task.board_id,
         agent_id=_comment_actor_id(actor),
@@ -2761,7 +2776,7 @@ async def create_task_comment(
     targets, mention_names = await _comment_targets(
         session,
         task=task,
-        message=payload.message,
+        message=sanitized_message,
         actor=actor,
     )
     await _notify_task_comment_targets(
@@ -2769,7 +2784,7 @@ async def create_task_comment(
         request=_TaskCommentNotifyRequest(
             task=task,
             actor=actor,
-            message=payload.message,
+            message=sanitized_message,
             targets=targets,
             mention_names=mention_names,
         ),
