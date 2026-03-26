@@ -18,6 +18,11 @@ node_modules/
 # Worktrees
 .worktrees/
 
+# Instance-specific data (DB, attachments, uploads)
+data/
+*.db
+backend/lcm.db
+
 # Accidental literal "~" directories (e.g. when a configured path contains "~" but isn't expanded)
 backend/~/
 backend/coverage.*
