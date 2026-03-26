@@ -254,10 +254,18 @@ def _require_board_lead(agent_ctx: AgentAuthContext) -> Agent:
 
 
 def _guard_task_access(agent_ctx: AgentAuthContext, task: Task) -> None:
-    allowed = not (
-        agent_ctx.agent.board_id and task.board_id and agent_ctx.agent.board_id != task.board_id
-    )
-    OpenClawAuthorizationPolicy.require_board_write_access(allowed=allowed)
+    agent = agent_ctx.agent
+    if not (agent.board_id and task.board_id):
+        OpenClawAuthorizationPolicy.require_board_write_access(allowed=True)
+        return
+    if agent.board_id == task.board_id:
+        OpenClawAuthorizationPolicy.require_board_write_access(allowed=True)
+        return
+    # Lead agents may write to tasks on other boards in the same gateway.
+    if agent.is_board_lead:
+        OpenClawAuthorizationPolicy.require_board_write_access(allowed=True)
+        return
+    OpenClawAuthorizationPolicy.require_board_write_access(allowed=False)
 
 
 async def _guard_task_read_access(
@@ -1274,7 +1282,7 @@ async def create_board_memory(
     )
     if not is_control_command:
         await _require_board_not_paused(board.id, session)
-    _guard_board_access(agent_ctx, board)
+    _guard_lead_cross_board_access(agent_ctx, board)
     return await board_memory_api.create_board_memory(
         payload=payload,
         board=board,
