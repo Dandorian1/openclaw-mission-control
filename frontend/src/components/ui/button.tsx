@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { Loader2, Check, AlertCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -37,16 +38,67 @@ const buttonVariants = cva(
 export interface ButtonProps
   extends
     React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {}
+    VariantProps<typeof buttonVariants> {
+  /** Loading state: shows spinner and disables interaction */
+  isLoading?: boolean;
+  /** Success state: shows checkmark briefly, then callback */
+  isSuccess?: boolean;
+  /** Error state: shows error icon */
+  isError?: boolean;
+  /** Label to show during loading */
+  loadingLabel?: string;
+}
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, ...props }, ref) => (
-    <button
-      ref={ref}
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
-  ),
+  (
+    {
+      className,
+      variant,
+      size,
+      isLoading = false,
+      isSuccess = false,
+      isError = false,
+      loadingLabel,
+      disabled,
+      children,
+      ...props
+    },
+    ref,
+  ) => {
+    // Determine what to show
+    const showLoading = isLoading && !isSuccess && !isError;
+    const showSuccess = isSuccess && !isError;
+    const showError = isError;
+
+    return (
+      <button
+        ref={ref}
+        disabled={disabled || isLoading || showSuccess}
+        className={cn(buttonVariants({ variant, size, className }))}
+        {...props}
+      >
+        {showLoading && (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {loadingLabel || "Loading..."}
+          </>
+        )}
+        {showSuccess && (
+          <>
+            <Check className="h-4 w-4" />
+            Success
+          </>
+        )}
+        {showError && (
+          <>
+            <AlertCircle className="h-4 w-4" />
+            {children}
+          </>
+        )}
+        {!showLoading && !showSuccess && !showError && children}
+      </button>
+    );
+  },
 );
 Button.displayName = "Button";
 

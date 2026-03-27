@@ -7,6 +7,9 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Main, Header } from "@/components/layout/Header";
+import { Skeleton, SkeletonCard, SkeletonText, SkeletonForm, SkeletonList } from "@/components/ui/skeleton";
+import { FormField, FormError } from "@/components/ui/form-error";
+import { EmptyState, NoResults, ErrorState } from "@/components/ui/empty-state";
 
 /**
  * Design System / Component Showcase Page
@@ -196,8 +199,64 @@ export default function DesignSystemPage() {
           </div>
         </section>
 
+        {/* Skeleton Loaders Section */}
+        <div>
+          <h2 className="text-xl font-semibold text-[color:var(--text)] mb-4">Skeleton Loaders</h2>
+          <Card>
+            <CardContent className="space-y-6 pt-6">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-[color:var(--text-quiet)]">Card Skeleton</p>
+                <SkeletonCard />
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-[color:var(--text-quiet)]">Text Skeleton</p>
+                <SkeletonText lines={3} />
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-[color:var(--text-quiet)]">Form Skeleton</p>
+                <SkeletonForm />
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-[color:var(--text-quiet)]">List Skeleton</p>
+                <SkeletonList count={3} />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Form Components Section */}
+        <div>
+          <h2 className="text-xl font-semibold text-[color:var(--text)] mb-4">Form Components</h2>
+          <Card>
+            <CardContent className="space-y-6 pt-6">
+              <FormField label="Email" required helpText="We'll never share your email">
+                <Input placeholder="your@email.com" type="email" />
+              </FormField>
+              <FormField label="Password" required error="Password must be at least 8 characters">
+                <Input placeholder="••••••••" type="password" />
+              </FormField>
+              <FormField label="Confirmed" success="Email verified successfully!">
+                <Input value="verified@email.com" disabled />
+              </FormField>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Empty States Section */}
+        <div>
+          <h2 className="text-xl font-semibold text-[color:var(--text)] mb-4">Empty States</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <EmptyState
+              type="default"
+              title="No items"
+              description="Get started by creating your first item."
+            />
+            <NoResults query="advanced search" />
+          </div>
+        </div>
+
         <div className="mt-8 pt-8 border-t border-[color:var(--border)] text-center text-sm text-[color:var(--text-muted)]">
-          <p>Design System • Last updated 2026-03-27</p>
+          <p>Design System • Last updated 2026-03-27 • Phase 1.5 Advanced Components</p>
         </div>
       </Main>
     </div>
