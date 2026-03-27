@@ -268,15 +268,57 @@ def _guard_task_access(agent_ctx: AgentAuthContext, task: Task) -> None:
     OpenClawAuthorizationPolicy.require_board_write_access(allowed=False)
 
 
-async def _guard_task_access_with_assignment(
+async def _is_agent_assigned_to_task(
+    session: AsyncSession,
+    *,
+    agent_id: UUID,
+    task_id: UUID,
+) -> bool:
+    """Check if an agent is assigned to a task via the junction table."""
+    from app.models.task_assignments import TaskAssignment
+
+    result = await session.execute(
+        select(TaskAssignment.id)
+        .where(
+            TaskAssignment.task_id == task_id,
+            TaskAssignment.agent_id == agent_id,
+        )
+        .limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def _guard_task_comment_access_with_assignment(
     agent_ctx: AgentAuthContext,
     task: Task,
     session: AsyncSession,
 ) -> None:
-    """Guard task write access, allowing cross-board writes for assigned agents.
+    """Guard task comment access, allowing cross-board comments for assigned agents."""
+    agent = agent_ctx.agent
+    if not (agent.board_id and task.board_id):
+        return
+    if agent.board_id == task.board_id:
+        return
+    if agent.is_board_lead:
+        return
+    if await _is_agent_assigned_to_task(session, agent_id=agent.id, task_id=task.id):
+        return
+    OpenClawAuthorizationPolicy.require_board_write_access(allowed=False)
 
-    Workers can write to tasks on other boards if they are assigned via
-    the task_assignments junction table.
+
+async def _guard_task_update_cross_board(
+    agent_ctx: AgentAuthContext,
+    task: Task,
+    payload: TaskUpdate,
+    session: AsyncSession,
+) -> None:
+    """Guard task update for cross-board workers.
+
+    Cross-board assigned workers can only:
+    - Change task status (their own workflow)
+    - Add a comment (inline via payload.comment)
+
+    They cannot change: title, description, priority, assignment, dependencies, tags, custom fields.
     """
     agent = agent_ctx.agent
     if not (agent.board_id and task.board_id):
@@ -285,20 +327,24 @@ async def _guard_task_access_with_assignment(
         return
     if agent.is_board_lead:
         return
-    # Cross-board worker: check if assigned via junction table
-    from app.models.task_assignments import TaskAssignment
+    # Cross-board worker: must be assigned
+    if not await _is_agent_assigned_to_task(session, agent_id=agent.id, task_id=task.id):
+        OpenClawAuthorizationPolicy.require_board_write_access(allowed=False)
+        return
 
-    result = await session.execute(
-        select(TaskAssignment.id)
-        .where(
-            TaskAssignment.task_id == task.id,
-            TaskAssignment.agent_id == agent.id,
+    # Restrict update fields: only status and comment allowed
+    forbidden_fields = {
+        "title", "description", "priority", "due_at",
+        "assigned_agent_id", "assigned_agent_ids",
+        "depends_on_task_ids", "tag_ids", "custom_field_values",
+    }
+    set_fields = payload.model_fields_set
+    disallowed = set_fields & forbidden_fields
+    if disallowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Cross-board workers can only update status and comment. Disallowed fields: {', '.join(sorted(disallowed))}",
         )
-        .limit(1)
-    )
-    if result.scalar_one_or_none() is not None:
-        return  # Agent is assigned — allow access
-    OpenClawAuthorizationPolicy.require_board_write_access(allowed=False)
 
 
 async def _guard_task_read_access(
@@ -1096,7 +1142,7 @@ async def update_task(
     Supports status, assignment, dependencies, and optional inline comment.
     """
     await _require_board_not_paused(task.board_id, session)
-    await _guard_task_access_with_assignment(agent_ctx, task, session)
+    await _guard_task_update_cross_board(agent_ctx, task, payload, session)
     return await tasks_api.update_task(
         payload=payload,
         task=task,
@@ -1220,7 +1266,7 @@ async def create_task_comment(
     This is the primary collaboration/log surface for task progress.
     """
     await _require_board_not_paused(task.board_id, session)
-    await _guard_task_access_with_assignment(agent_ctx, task, session)
+    await _guard_task_comment_access_with_assignment(agent_ctx, task, session)
     return await tasks_api.create_task_comment(
         payload=payload,
         task=task,
