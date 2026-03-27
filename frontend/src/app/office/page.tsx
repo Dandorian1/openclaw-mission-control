@@ -314,17 +314,21 @@ function ChatPanel({
     }
   }, [boards, selectedBoardId]);
 
-  // Load chat messages
+  // Load office meeting chat messages (filtered by "office-meeting" tag)
   const loadMessages = useCallback(async () => {
     if (!selectedBoardId) return;
     try {
       const res = await listBoardMemoryApiV1BoardsBoardIdMemoryGet(
         selectedBoardId,
-        { is_chat: true, limit: 50 },
+        { is_chat: true, limit: 100 },
       );
       if (res.status === 200) {
         const items = (res.data as { items?: BoardMemoryRead[] })?.items ?? [];
-        const sorted = [...items].sort(
+        // Filter to only office meeting messages
+        const officeMessages = items.filter(
+          (m) => m.tags?.includes("office-meeting"),
+        );
+        const sorted = [...officeMessages].sort(
           (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
         );
         setChatMessages(sorted);
@@ -358,7 +362,7 @@ function ChatPanel({
     try {
       const res = await createBoardMemoryApiV1BoardsBoardIdMemoryPost(
         selectedBoardId,
-        { content: message.trim(), tags: ["chat"], source: "Office Chat" },
+        { content: message.trim(), tags: ["chat", "office-meeting"], source: "Office Meeting" },
       );
       if (res.status === 200) {
         setMessage("");
@@ -384,7 +388,7 @@ function ChatPanel({
       <div className="flex items-center justify-between border-b border-[color:var(--border)] px-4 py-3">
         <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted">
           <MessageCircle className="h-3.5 w-3.5" />
-          Board Chat
+          Office Meeting Chat
         </h3>
         <button onClick={onClose} className="text-muted hover:text-strong transition">
           <X className="h-4 w-4" />
@@ -417,8 +421,8 @@ function ChatPanel({
         ) : chatMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-muted">
             <MessageCircle className="h-6 w-6 opacity-30 mb-2" />
-            <p className="text-[11px]">No messages yet</p>
-            <p className="text-[10px] mt-0.5">Start the conversation!</p>
+            <p className="text-[11px]">No meeting messages yet</p>
+            <p className="text-[10px] mt-0.5">Messages here are separate from board chat.</p>
           </div>
         ) : (
           chatMessages.map((msg) => (
