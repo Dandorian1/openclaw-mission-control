@@ -318,27 +318,43 @@ function ChatPanel({
   const loadMessages = useCallback(async () => {
     if (!selectedBoardId) return;
     try {
-      const res = await listBoardMemoryApiV1BoardsBoardIdMemoryGet(
-        selectedBoardId,
-        { is_chat: true, limit: 100 },
-      );
-      if (res.status === 200) {
-        const items = (res.data as { items?: BoardMemoryRead[] })?.items ?? [];
-        // Filter to only office meeting messages
-        const officeMessages = items.filter(
-          (m) => m.tags?.includes("office-meeting"),
+      const allMessages: BoardMemoryRead[] = [];
+      
+      // If "All Boards" is selected, fetch from each board
+      if (selectedBoardId === "__all__") {
+        for (const board of boards) {
+          const res = await listBoardMemoryApiV1BoardsBoardIdMemoryGet(
+            board.id,
+            { is_chat: true, limit: 100 },
+          );
+          if (res.status === 200) {
+            const items = (res.data as { items?: BoardMemoryRead[] })?.items ?? [];
+            allMessages.push(...items.filter((m) => m.tags?.includes("office-meeting")));
+          }
+        }
+      } else {
+        // Single board mode
+        const res = await listBoardMemoryApiV1BoardsBoardIdMemoryGet(
+          selectedBoardId,
+          { is_chat: true, limit: 100 },
         );
-        const sorted = [...officeMessages].sort(
-          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-        );
-        setChatMessages(sorted);
+        if (res.status === 200) {
+          const items = (res.data as { items?: BoardMemoryRead[] })?.items ?? [];
+          allMessages.push(...items.filter((m) => m.tags?.includes("office-meeting")));
+        }
       }
+      
+      // Sort all messages by timestamp
+      const sorted = [...allMessages].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      );
+      setChatMessages(sorted);
     } catch {
       // silent
     } finally {
       setIsLoading(false);
     }
-  }, [selectedBoardId]);
+  }, [selectedBoardId, boards]);
 
   // Initial load + polling
   useEffect(() => {
@@ -360,8 +376,10 @@ function ChatPanel({
     if (!message.trim() || !selectedBoardId || isSending) return;
     setIsSending(true);
     try {
+      // If viewing "All Boards", send to first board; otherwise send to selected board
+      const targetBoardId = selectedBoardId === "__all__" ? boards[0]!.id : selectedBoardId;
       const res = await createBoardMemoryApiV1BoardsBoardIdMemoryPost(
-        selectedBoardId,
+        targetBoardId,
         { content: message.trim(), tags: ["chat", "office-meeting"], source: "Office Meeting" },
       );
       if (res.status === 200) {
@@ -373,7 +391,7 @@ function ChatPanel({
     } finally {
       setIsSending(false);
     }
-  }, [message, selectedBoardId, isSending, loadMessages]);
+  }, [message, selectedBoardId, isSending, loadMessages, boards]);
 
   // Build agent name map for display
   const agentNameMap = useMemo(() => {
@@ -395,14 +413,18 @@ function ChatPanel({
         </button>
       </div>
 
-      {/* Board selector */}
-      {boards.length > 1 && (
+      {/* Chat target selector */}
+      {boards.length > 0 && (
         <div className="border-b border-[color:var(--border)] px-4 py-2">
+          <label className="text-[10px] font-semibold text-muted mb-1 block">Chat in:</label>
           <select
             value={selectedBoardId}
             onChange={(e) => setSelectedBoardId(e.target.value)}
             className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-1 text-[11px] text-strong"
           >
+            {boards.length > 1 && (
+              <option value="__all__">✦ All Boards (Office Meeting)</option>
+            )}
             {boards.map((b) => (
               <option key={b.id} value={b.id}>{b.name}</option>
             ))}
