@@ -1231,8 +1231,26 @@ def _task_list_statement(
     status_filter: str | None,
     assigned_agent_id: UUID | None,
     unassigned: bool | None,
+    include_cross_board: bool = False,
+    cross_board_agent_ids: Sequence[UUID] | None = None,
 ) -> SelectOfScalar[Task]:
-    statement = select(Task).where(Task.board_id == board_id)
+    from app.models.task_assignments import TaskAssignment
+
+    if include_cross_board and cross_board_agent_ids:
+        # Include tasks on this board OR tasks assigned to agents from this board
+        cross_board_subquery = (
+            select(TaskAssignment.task_id)
+            .where(TaskAssignment.agent_id.in_(cross_board_agent_ids))  # type: ignore[union-attr]
+        )
+        statement = select(Task).where(
+            or_(
+                Task.board_id == board_id,
+                Task.id.in_(cross_board_subquery),  # type: ignore[union-attr]
+            )
+        )
+    else:
+        statement = select(Task).where(Task.board_id == board_id)
+
     statuses = _status_values(status_filter)
     if statuses:
         statement = statement.where(col(Task.status).in_(statuses))
@@ -1500,13 +1518,21 @@ async def list_tasks(
     board: Board = BOARD_READ_DEP,
     session: AsyncSession = SESSION_DEP,
     _actor: ActorContext = ACTOR_DEP,
+    include_cross_board: bool = False,
+    cross_board_agent_ids: Sequence[UUID] | None = None,
 ) -> LimitOffsetPage[TaskRead]:
-    """List board tasks with optional status and assignment filters."""
+    """List board tasks with optional status and assignment filters.
+
+    When include_cross_board=True and cross_board_agent_ids is provided,
+    also includes tasks from other boards where agents from this board are assigned.
+    """
     statement = _task_list_statement(
         board_id=board.id,
         status_filter=status_filter,
         assigned_agent_id=assigned_agent_id,
         unassigned=unassigned,
+        include_cross_board=include_cross_board,
+        cross_board_agent_ids=cross_board_agent_ids,
     )
 
     async def _transform(items: Sequence[object]) -> Sequence[object]:

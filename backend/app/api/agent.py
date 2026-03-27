@@ -669,8 +669,17 @@ async def list_tasks(
     Common patterns:
     - worker: fetch assigned inbox/in-progress tasks
     - lead: fetch unassigned inbox tasks for delegation
+
+    Also includes cross-board tasks where agents from this board are assigned.
     """
     _guard_board_access(agent_ctx, board)
+
+    # Collect agent IDs from this board for cross-board task inclusion
+    board_agents = await Agent.objects.filter(
+        col(Agent.board_id) == board.id,
+    ).all(session)
+    board_agent_ids = [a.id for a in board_agents]
+
     return await tasks_api.list_tasks(
         status_filter=filters.status_filter,
         assigned_agent_id=filters.assigned_agent_id,
@@ -678,6 +687,8 @@ async def list_tasks(
         board=board,
         session=session,
         _actor=_actor(agent_ctx),
+        include_cross_board=True,
+        cross_board_agent_ids=board_agent_ids,
     )
 
 
