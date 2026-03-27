@@ -25,6 +25,7 @@ from app.models.task_custom_fields import (
     TaskCustomFieldDefinition,
     TaskCustomFieldValue,
 )
+from app.models.task_assignments import TaskAssignment
 from app.models.task_attachments import TaskAttachment
 from app.models.task_dependencies import TaskDependency
 from app.models.task_fingerprints import TaskFingerprint
@@ -55,6 +56,7 @@ __all__ = [
     "OrganizationBoardAccess",
     "OrganizationInvite",
     "OrganizationInviteBoardAccess",
+    "TaskAssignment",
     "TaskDependency",
     "Task",
     "TaskFingerprint",
