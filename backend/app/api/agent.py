@@ -759,14 +759,12 @@ async def list_tasks(
     ).all(session)
     board_agent_ids = [a.id for a in board_agents]
 
-    return await tasks_api.list_tasks(
+    return await tasks_api.list_tasks_cross_board(
+        board_id=board.id,
         status_filter=filters.status_filter,
         assigned_agent_id=filters.assigned_agent_id,
         unassigned=filters.unassigned,
-        board=board,
         session=session,
-        _actor=_actor(agent_ctx),
-        include_cross_board=True,
         cross_board_agent_ids=board_agent_ids,
     )
 

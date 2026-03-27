@@ -1518,21 +1518,13 @@ async def list_tasks(
     board: Board = BOARD_READ_DEP,
     session: AsyncSession = SESSION_DEP,
     _actor: ActorContext = ACTOR_DEP,
-    include_cross_board: bool = False,
-    cross_board_agent_ids: Sequence[UUID] | None = None,
 ) -> LimitOffsetPage[TaskRead]:
-    """List board tasks with optional status and assignment filters.
-
-    When include_cross_board=True and cross_board_agent_ids is provided,
-    also includes tasks from other boards where agents from this board are assigned.
-    """
+    """List board tasks with optional status and assignment filters."""
     statement = _task_list_statement(
         board_id=board.id,
         status_filter=status_filter,
         assigned_agent_id=assigned_agent_id,
         unassigned=unassigned,
-        include_cross_board=include_cross_board,
-        cross_board_agent_ids=cross_board_agent_ids,
     )
 
     async def _transform(items: Sequence[object]) -> Sequence[object]:
@@ -1540,6 +1532,39 @@ async def list_tasks(
         return await _task_read_page(
             session=session,
             board_id=board.id,
+            tasks=tasks,
+        )
+
+    return await paginate(session, statement, transformer=_transform)
+
+
+async def list_tasks_cross_board(
+    *,
+    board_id: UUID,
+    status_filter: str | None,
+    assigned_agent_id: UUID | None,
+    unassigned: bool | None,
+    session: AsyncSession,
+    cross_board_agent_ids: Sequence[UUID],
+) -> LimitOffsetPage[TaskRead]:
+    """Internal helper: list tasks including cross-board assignments.
+
+    Not a route handler — called from agent API only.
+    """
+    statement = _task_list_statement(
+        board_id=board_id,
+        status_filter=status_filter,
+        assigned_agent_id=assigned_agent_id,
+        unassigned=unassigned,
+        include_cross_board=True,
+        cross_board_agent_ids=cross_board_agent_ids,
+    )
+
+    async def _transform(items: Sequence[object]) -> Sequence[object]:
+        tasks = _coerce_task_items(items)
+        return await _task_read_page(
+            session=session,
+            board_id=board_id,
             tasks=tasks,
         )
 
