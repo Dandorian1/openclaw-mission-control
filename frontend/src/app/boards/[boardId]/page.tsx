@@ -2282,13 +2282,11 @@ export default function BoardDetailPage() {
 
   const assigneeById = useMemo(() => {
     const map = new Map<string, string>();
-    agents
-      .filter((agent) => !boardId || agent.board_id === boardId)
-      .forEach((agent) => {
-        map.set(agent.id, agent.name);
-      });
+    agents.forEach((agent) => {
+      map.set(agent.id, agent.name);
+    });
     return map;
-  }, [agents, boardId]);
+  }, [agents]);
 
   const taskTitleById = useMemo(() => {
     const map = new Map<string, string>();
@@ -2339,6 +2337,15 @@ export default function BoardDetailPage() {
     })();
     return () => { cancelled = true; };
   }, [board?.gateway_id, boardId]);
+
+  // Extend assigneeById with cross-board agent names
+  const allAssigneeById = useMemo(() => {
+    const map = new Map(assigneeById);
+    crossBoardAgents.forEach((agent) => {
+      if (!map.has(agent.id)) map.set(agent.id, agent.name);
+    });
+    return map;
+  }, [assigneeById, crossBoardAgents]);
 
   const assignableAgents = useMemo(
     () => agents.filter((agent) => !agent.is_board_lead),
@@ -3778,10 +3785,14 @@ export default function BoardDetailPage() {
                                                 )}
                                               </p>
                                             </div>
-                                            <p className="mt-2 truncate text-xs text-muted">
-                                              Assignee:{" "}
+                                            <p className="mt-2 text-xs text-muted">
+                                              {(task.assigned_agent_ids?.length ?? 0) > 1 ? "Assignees: " : "Assignee: "}
                                               <span className="font-medium text-strong">
-                                                {task.assignee ?? "Unassigned"}
+                                                {(task.assigned_agent_ids?.length ?? 0) > 0
+                                                  ? task.assigned_agent_ids!
+                                                      .map((id) => allAssigneeById.get(id) ?? id.slice(0, 8))
+                                                      .join(", ")
+                                                  : task.assignee ?? "Unassigned"}
                                               </span>
                                             </p>
                                             {task.tags?.length ? (
@@ -3969,7 +3980,11 @@ export default function BoardDetailPage() {
                                     </div>
                                   ) : null}
                                   <span className="text-xs text-muted">
-                                    {task.assignee ?? "Unassigned"}
+                                    {(task.assigned_agent_ids?.length ?? 0) > 0
+                                      ? task.assigned_agent_ids!
+                                          .map((id) => allAssigneeById.get(id) ?? id.slice(0, 8))
+                                          .join(", ")
+                                      : task.assignee ?? "Unassigned"}
                                   </span>
                                   <span className="text-xs text-muted">
                                     {formatTaskTimestamp(
