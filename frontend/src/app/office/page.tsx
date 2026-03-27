@@ -312,14 +312,15 @@ function ChatPanel({
     }
   }, [boards, selectedBoardId]);
 
-  // Load chat messages — shows ALL board chat messages (not just office-meeting tagged)
+  // Load chat messages — uses group memory for cross-board visibility
   const loadMessages = useCallback(async () => {
-    if (!selectedBoardId || !selectedBoardId.startsWith("board-")) return;
+    if (!selectedBoardId) return;
+    // For "All Boards" mode, use first board as context — group memory is shared across all boards
+    const contextBoardId = selectedBoardId === "__all__" ? boards[0]?.id : selectedBoardId;
+    if (!contextBoardId) return;
     try {
-      // Use group memory for cross-board visibility
-      // Group memory includes messages from all boards in the linked group
       const res = await listBoardGroupMemoryForBoardApiV1BoardsBoardIdGroupMemoryGet(
-        selectedBoardId,
+        contextBoardId,
         { is_chat: true, limit: 100 },
       );
       
@@ -336,7 +337,7 @@ function ChatPanel({
     } finally {
       setIsLoading(false);
     }
-  }, [selectedBoardId]);
+  }, [selectedBoardId, boards]);
 
   // Initial load + polling
   useEffect(() => {
@@ -356,11 +357,14 @@ function ChatPanel({
 
   const handleSend = useCallback(async () => {
     if (!message.trim() || !selectedBoardId || isSending) return;
+    // For "All Boards" mode, post to first board — group memory is shared across all boards
+    const contextBoardId = selectedBoardId === "__all__" ? boards[0]?.id : selectedBoardId;
+    if (!contextBoardId) return;
     setIsSending(true);
     try {
       // Use group memory so message is visible to all boards in the group
       const res = await createBoardGroupMemoryForBoardApiV1BoardsBoardIdGroupMemoryPost(
-        selectedBoardId,
+        contextBoardId,
         { content: message.trim(), tags: ["chat", "office-meeting"], source: "Office Meeting" },
       );
       if (res.status === 200) {
@@ -372,7 +376,7 @@ function ChatPanel({
     } finally {
       setIsSending(false);
     }
-  }, [message, selectedBoardId, isSending, loadMessages]);
+  }, [message, selectedBoardId, isSending, loadMessages, boards]);
 
   // Build agent name map for display
   const agentNameMap = useMemo(() => {
