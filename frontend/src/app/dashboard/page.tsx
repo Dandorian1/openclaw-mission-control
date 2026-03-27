@@ -1021,9 +1021,25 @@ export default function DashboardPage() {
         <DashboardSidebar />
         <main className="flex-1 overflow-y-auto bg-app">
           <div className="p-4 md:p-8">
-            <h1 className="mb-4 text-2xl font-semibold tracking-tight text-strong">
-              Dashboard
-            </h1>
+            {/* Hero Header */}
+            <div className="mb-6 rounded-xl bg-[color:var(--surface)] border border-[color:var(--border)] px-8 py-8 text-center">
+              <h1 className="text-2xl font-semibold tracking-tight text-strong md:text-3xl">
+                Welcome back
+              </h1>
+              <p className="mt-1 text-sm text-muted">
+                {new Date().toLocaleDateString("en-US", {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                })}{" "}
+                &middot;{" "}
+                {new Date().toLocaleTimeString("en-US", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  timeZoneName: "short",
+                })}
+              </p>
+            </div>
             {metricsQuery.error ? (
               <div className="mb-4 rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-700">
                 Load failed: {metricsQuery.error.message}
@@ -1032,28 +1048,28 @@ export default function DashboardPage() {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
               <TopMetricCard
-                title="Online Agents"
-                value={formatCount(activeAgentsMetric)}
-                secondary={`${formatCount(agents.length)} total`}
+                title="Agents"
+                value={formatCount(agents.length)}
+                secondary={`${formatCount(activeAgentsMetric)} online`}
                 icon={<Bot className="h-4 w-4" />}
               />
               <TopMetricCard
-                title="Tasks In Progress"
-                value={formatCount(tasksInProgressMetric)}
-                secondary={`${formatCount(tasksTotal)} total`}
+                title="Tasks"
+                value={formatCount(throughputTotal)}
+                secondary={formatPerDay(throughputTotal, DASHBOARD_RANGE_DAYS)}
                 icon={<LayoutGrid className="h-4 w-4" />}
               />
               <TopMetricCard
-                title="Error Rate"
-                value={formatPercent(errorRateMetric)}
-                secondary={`${formatCount(Number(latestThroughputPoint?.value ?? 0))} completed (latest)`}
+                title="Boards"
+                value={formatCount(boards.length)}
+                secondary={`${formatCount(gatewayConnectedCount)} connected`}
                 icon={<Activity className="h-4 w-4" />}
               />
               <TopMetricCard
-                title="Completion Speed"
-                value={formatPerDay(throughputTotal, DASHBOARD_RANGE_DAYS)}
-                secondary={`${formatCount(throughputTotal)} completed`}
-                icon={<Timer className="h-4 w-4" />}
+                title="Approvals"
+                value={formatCount(pendingApprovalsTotal)}
+                secondary="pending"
+                icon={<Shield className="h-4 w-4" />}
               />
             </div>
 
