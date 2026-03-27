@@ -2311,8 +2311,16 @@ async def _lead_apply_assignment(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Board leads cannot assign tasks to themselves.",
             )
+    # Cross-board assignment is allowed if agents share the same gateway.
     if agent.board_id and update.task.board_id and agent.board_id != update.task.board_id:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT)
+        task_board = await Board.objects.by_id(update.task.board_id).first(session)
+        agent_board = await Board.objects.by_id(agent.board_id).first(session)
+        if (
+            task_board is None
+            or agent_board is None
+            or task_board.gateway_id != agent_board.gateway_id
+        ):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT)
     update.task.assigned_agent_id = agent.id
 
 
@@ -2759,8 +2767,17 @@ async def _apply_admin_task_rules(
         agent = await Agent.objects.by_id(assigned_agent_id).first(session)
         if agent is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        # Cross-board assignment is allowed if agents share the same gateway.
+        # Only reject if they are on different gateways entirely.
         if agent.board_id and update.task.board_id and agent.board_id != update.task.board_id:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT)
+            task_board = await Board.objects.by_id(update.task.board_id).first(session)
+            agent_board = await Board.objects.by_id(agent.board_id).first(session)
+            if (
+                task_board is None
+                or agent_board is None
+                or task_board.gateway_id != agent_board.gateway_id
+            ):
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT)
 
 
 async def _record_task_comment_from_update(
@@ -2926,6 +2943,9 @@ async def _finalize_updated_task(
     *,
     update: _TaskUpdateInput,
 ) -> TaskRead:
+    # Pop non-model fields before applying setattr to the ORM object.
+    # assigned_agent_ids is a schema-only field synced via junction table below.
+    _assigned_agent_ids_update = update.updates.pop("assigned_agent_ids", None)
     for key, value in update.updates.items():
         setattr(update.task, key, value)
     await _require_no_pending_approval_for_status_change_when_enabled(
@@ -3000,12 +3020,11 @@ async def _finalize_updated_task(
     session.add(update.task)
 
     # Sync junction table if assigned_agent_ids was explicitly set in the update
-    assigned_agent_ids_update = update.updates.pop("assigned_agent_ids", None)
-    if assigned_agent_ids_update is not None:
+    if _assigned_agent_ids_update is not None:
         await _sync_task_assignments(
             session,
             task_id=update.task.id,
-            assigned_agent_ids=assigned_agent_ids_update,
+            assigned_agent_ids=_assigned_agent_ids_update,
         )
     elif "assigned_agent_id" in update.updates:
         # Backward compat: single agent assignment via legacy field

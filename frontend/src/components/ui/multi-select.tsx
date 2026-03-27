@@ -86,7 +86,7 @@ export function MultiSelect({
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-1" align="start">
+      <PopoverContent className="w-full bg-[color:var(--surface)] border-[color:var(--border)] p-1" align="start">
         <div className="max-h-60 overflow-y-auto">
           {options.map((option) => {
             const isSelected = value.includes(option.value);
