@@ -66,7 +66,10 @@ import { MultiSelect } from "@/components/ui/multi-select";
 import { ApiError, customFetch } from "@/api/mutator";
 import { getLocalAuthToken, isLocalAuthMode } from "@/auth/localAuth";
 import { getApiBaseUrl } from "@/lib/api-base";
-import { streamAgentsApiV1AgentsStreamGet } from "@/api/generated/agents/agents";
+import {
+  streamAgentsApiV1AgentsStreamGet,
+  listAgentsApiV1AgentsGet,
+} from "@/api/generated/agents/agents";
 import {
   streamApprovalsApiV1BoardsBoardIdApprovalsStreamGet,
   updateApprovalApiV1BoardsBoardIdApprovalsApprovalIdPatch,
@@ -2311,10 +2314,49 @@ export default function BoardDetailPage() {
     });
   }, [liveFeed]);
 
+  // Cross-board agents: fetch agents from all boards in the same gateway
+  const [crossBoardAgents, setCrossBoardAgents] = useState<Agent[]>([]);
+  useEffect(() => {
+    if (!board?.gateway_id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await listAgentsApiV1AgentsGet({
+          gateway_id: board.gateway_id!,
+          limit: 200,
+        });
+        if (!cancelled && res.status === 200) {
+          const allAgents = (res.data as { items?: Agent[] })?.items ?? [];
+          // Filter: only agents from OTHER boards, excluding leads
+          const otherBoardAgents = allAgents.filter(
+            (a) => a.board_id !== boardId && !a.is_board_lead,
+          );
+          setCrossBoardAgents(otherBoardAgents.map(normalizeAgent));
+        }
+      } catch {
+        // silent — cross-board agents are a nice-to-have
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [board?.gateway_id, boardId]);
+
   const assignableAgents = useMemo(
     () => agents.filter((agent) => !agent.is_board_lead),
     [agents],
   );
+
+  // All assignable agents: local board agents + cross-board agents (with board labels)
+  const allAssignableOptions = useMemo(() => {
+    const localOpts = assignableAgents.map((a) => ({
+      value: a.id,
+      label: a.name,
+    }));
+    const crossOpts = crossBoardAgents.map((a) => ({
+      value: a.id,
+      label: `${a.name} (cross-board)`,
+    }));
+    return [...localOpts, ...crossOpts];
+  }, [assignableAgents, crossBoardAgents]);
   const sessionStats = useMemo(() => {
     // Phase 2: filter messages that carry usage data (populated once API exposes usage fields)
     const withUsage = chatMessages.filter(
@@ -4665,10 +4707,7 @@ export default function BoardDetailPage() {
                 Assignees
               </label>
               <MultiSelect
-                options={assignableAgents.map((agent) => ({
-                  value: agent.id,
-                  label: agent.name,
-                }))}
+                options={allAssignableOptions}
                 value={editAssigneeIds}
                 onValueChange={(ids) => {
                   setEditAssigneeIds(ids);
@@ -4677,7 +4716,7 @@ export default function BoardDetailPage() {
                 placeholder="Select agents..."
                 disabled={!selectedTask || isSavingTask || !canWrite}
               />
-              {assignableAgents.length === 0 ? (
+              {allAssignableOptions.length === 0 ? (
                 <p className="text-xs text-muted">
                   Add agents to assign tasks.
                 </p>
