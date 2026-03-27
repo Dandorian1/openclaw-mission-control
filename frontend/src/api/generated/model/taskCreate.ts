@@ -19,6 +19,7 @@ export interface TaskCreate {
   priority?: TaskCreatePriority;
   due_at?: string | null;
   assigned_agent_id?: string | null;
+  assigned_agent_ids?: string[];
   depends_on_task_ids?: string[];
   tag_ids?: string[];
   created_by_user_id?: string | null;

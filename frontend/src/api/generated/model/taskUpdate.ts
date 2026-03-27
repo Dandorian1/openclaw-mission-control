@@ -16,6 +16,7 @@ export interface TaskUpdate {
   priority?: "critical" | "high" | "medium" | "low" | null;
   due_at?: string | null;
   assigned_agent_id?: string | null;
+  assigned_agent_ids?: string[];
   depends_on_task_ids?: string[] | null;
   tag_ids?: string[] | null;
   custom_field_values?: TaskUpdateCustomFieldValues;

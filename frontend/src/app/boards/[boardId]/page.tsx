@@ -62,6 +62,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { ApiError, customFetch } from "@/api/mutator";
 import { getLocalAuthToken, isLocalAuthMode } from "@/auth/localAuth";
 import { getApiBaseUrl } from "@/lib/api-base";
@@ -1296,6 +1297,7 @@ export default function BoardDetailPage() {
   const [editPriority, setEditPriority] = useState<"critical" | "high" | "medium" | "low">("medium");
   const [editDueDate, setEditDueDate] = useState("");
   const [editAssigneeId, setEditAssigneeId] = useState("");
+  const [editAssigneeIds, setEditAssigneeIds] = useState<string[]>([]);
   const [editTagIds, setEditTagIds] = useState<string[]>([]);
   const [editDependsOnTaskIds, setEditDependsOnTaskIds] = useState<string[]>(
     [],
@@ -1800,6 +1802,7 @@ export default function BoardDetailPage() {
       setEditPriority("medium");
       setEditDueDate("");
       setEditAssigneeId("");
+      setEditAssigneeIds([]);
       setEditTagIds([]);
       setEditDependsOnTaskIds([]);
       setEditCustomFieldValues(
@@ -1814,6 +1817,7 @@ export default function BoardDetailPage() {
     setEditPriority((selectedTask.priority ?? "medium") as "critical" | "high" | "medium" | "low");
     setEditDueDate(toLocalDateInput(selectedTask.due_at));
     setEditAssigneeId(selectedTask.assigned_agent_id ?? "");
+    setEditAssigneeIds(selectedTask.assigned_agent_ids ?? []);
     setEditTagIds(selectedTask.tag_ids ?? []);
     setEditDependsOnTaskIds(selectedTask.depends_on_task_ids ?? []);
     setEditCustomFieldValues(
@@ -2957,7 +2961,8 @@ export default function BoardDetailPage() {
         description: editDescription.trim() || null,
         status: editStatus,
         priority: editPriority,
-        assigned_agent_id: editAssigneeId || null,
+        assigned_agent_id: editAssigneeIds.length > 0 ? editAssigneeIds[0] : (editAssigneeId || null),
+        assigned_agent_ids: editAssigneeIds.length > 0 ? editAssigneeIds : (editAssigneeId ? [editAssigneeId] : []),
       };
 
       if (depsChanged && selectedTask.status !== "done") {
@@ -3037,6 +3042,7 @@ export default function BoardDetailPage() {
     setEditPriority((selectedTask.priority ?? "medium") as "critical" | "high" | "medium" | "low");
     setEditDueDate(toLocalDateInput(selectedTask.due_at));
     setEditAssigneeId(selectedTask.assigned_agent_id ?? "");
+    setEditAssigneeIds(selectedTask.assigned_agent_ids ?? []);
     setEditTagIds(selectedTask.tag_ids ?? []);
     setEditDependsOnTaskIds(selectedTask.depends_on_task_ids ?? []);
     setEditCustomFieldValues(
@@ -4656,27 +4662,21 @@ export default function BoardDetailPage() {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-semibold uppercase tracking-wider text-muted">
-                Assignee
+                Assignees
               </label>
-              <Select
-                value={editAssigneeId || "unassigned"}
-                onValueChange={(value) =>
-                  setEditAssigneeId(value === "unassigned" ? "" : value)
-                }
+              <MultiSelect
+                options={assignableAgents.map((agent) => ({
+                  value: agent.id,
+                  label: agent.name,
+                }))}
+                value={editAssigneeIds}
+                onValueChange={(ids) => {
+                  setEditAssigneeIds(ids);
+                  setEditAssigneeId(ids[0] ?? "");
+                }}
+                placeholder="Select agents..."
                 disabled={!selectedTask || isSavingTask || !canWrite}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Unassigned" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {assignableAgents.map((agent) => (
-                    <SelectItem key={agent.id} value={agent.id}>
-                      {agent.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
               {assignableAgents.length === 0 ? (
                 <p className="text-xs text-muted">
                   Add agents to assign tasks.
