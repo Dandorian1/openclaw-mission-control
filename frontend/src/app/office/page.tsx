@@ -17,12 +17,10 @@ import {
   useListActivityApiV1ActivityGet,
 } from "@/api/generated/activity/activity";
 import {
-  listBoardMemoryApiV1BoardsBoardIdMemoryGet,
-} from "@/api/generated/board-memory/board-memory";
-import {
-  createBoardMemoryApiV1BoardsBoardIdMemoryPost,
-} from "@/api/generated/board-memory/board-memory";
-import type { AgentRead, BoardRead, BoardMemoryRead } from "@/api/generated/model";
+  listBoardGroupMemoryForBoardApiV1BoardsBoardIdGroupMemoryGet,
+  createBoardGroupMemoryForBoardApiV1BoardsBoardIdGroupMemoryPost,
+} from "@/api/generated/board-group-memory/board-group-memory";
+import type { AgentRead, BoardRead, BoardGroupMemoryRead } from "@/api/generated/model";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import {
   Building2,
@@ -300,7 +298,7 @@ function ChatPanel({
   boards: BoardRead[];
 }) {
   const [message, setMessage] = useState("");
-  const [chatMessages, setChatMessages] = useState<BoardMemoryRead[]>([]);
+  const [chatMessages, setChatMessages] = useState<BoardGroupMemoryRead[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedBoardId, setSelectedBoardId] = useState<string>("");
@@ -316,45 +314,29 @@ function ChatPanel({
 
   // Load chat messages — shows ALL board chat messages (not just office-meeting tagged)
   const loadMessages = useCallback(async () => {
-    if (!selectedBoardId) return;
+    if (!selectedBoardId || !selectedBoardId.startsWith("board-")) return;
     try {
-      const allMessages: BoardMemoryRead[] = [];
-      
-      // If "All Boards" is selected, fetch from each board
-      if (selectedBoardId === "__all__") {
-        for (const board of boards) {
-          const res = await listBoardMemoryApiV1BoardsBoardIdMemoryGet(
-            board.id,
-            { is_chat: true, limit: 100 },
-          );
-          if (res.status === 200) {
-            const items = (res.data as { items?: BoardMemoryRead[] })?.items ?? [];
-            allMessages.push(...items);
-          }
-        }
-      } else {
-        // Single board mode
-        const res = await listBoardMemoryApiV1BoardsBoardIdMemoryGet(
-          selectedBoardId,
-          { is_chat: true, limit: 100 },
-        );
-        if (res.status === 200) {
-          const items = (res.data as { items?: BoardMemoryRead[] })?.items ?? [];
-          allMessages.push(...items);
-        }
-      }
-      
-      // Sort all messages by timestamp
-      const sorted = [...allMessages].sort(
-        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      // Use group memory for cross-board visibility
+      // Group memory includes messages from all boards in the linked group
+      const res = await listBoardGroupMemoryForBoardApiV1BoardsBoardIdGroupMemoryGet(
+        selectedBoardId,
+        { is_chat: true, limit: 100 },
       );
-      setChatMessages(sorted);
+      
+      if (res.status === 200) {
+        const items = (res.data as { items?: BoardGroupMemoryRead[] })?.items ?? [];
+        // Sort by timestamp
+        const sorted = [...items].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        );
+        setChatMessages(sorted);
+      }
     } catch {
       // silent
     } finally {
       setIsLoading(false);
     }
-  }, [selectedBoardId, boards]);
+  }, [selectedBoardId]);
 
   // Initial load + polling
   useEffect(() => {
@@ -376,10 +358,9 @@ function ChatPanel({
     if (!message.trim() || !selectedBoardId || isSending) return;
     setIsSending(true);
     try {
-      // If viewing "All Boards", send to first board; otherwise send to selected board
-      const targetBoardId = selectedBoardId === "__all__" ? boards[0]!.id : selectedBoardId;
-      const res = await createBoardMemoryApiV1BoardsBoardIdMemoryPost(
-        targetBoardId,
+      // Use group memory so message is visible to all boards in the group
+      const res = await createBoardGroupMemoryForBoardApiV1BoardsBoardIdGroupMemoryPost(
+        selectedBoardId,
         { content: message.trim(), tags: ["chat", "office-meeting"], source: "Office Meeting" },
       );
       if (res.status === 200) {
@@ -391,7 +372,7 @@ function ChatPanel({
     } finally {
       setIsSending(false);
     }
-  }, [message, selectedBoardId, isSending, loadMessages, boards]);
+  }, [message, selectedBoardId, isSending, loadMessages]);
 
   // Build agent name map for display
   const agentNameMap = useMemo(() => {
