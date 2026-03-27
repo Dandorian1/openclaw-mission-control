@@ -2534,6 +2534,23 @@ async def _apply_lead_task_update(
 
     update.task.updated_at = utcnow()
     session.add(update.task)
+
+    # Sync junction table for lead updates (same logic as _finalize_updated_task)
+    assigned_agent_ids_update = update.updates.pop("assigned_agent_ids", None)
+    if assigned_agent_ids_update is not None:
+        await _sync_task_assignments(
+            session,
+            task_id=update.task.id,
+            assigned_agent_ids=assigned_agent_ids_update,
+        )
+    elif "assigned_agent_id" in update.updates:
+        # Backward compat: single agent assignment via legacy field
+        await _sync_task_assignments(
+            session,
+            task_id=update.task.id,
+            assigned_agent_id=update.task.assigned_agent_id,
+        )
+
     event_type, message = _task_event_details(update.task, update.previous_status)
     record_activity(
         session,
