@@ -28,16 +28,16 @@ async function validateLocalToken(token: string): Promise<string | null> {
       },
     });
   } catch {
-    return "Unable to reach backend to validate token.";
+    return "Could not reach the backend. Check that the gateway is running with `openclaw status`";
   }
 
   if (response.ok) {
     return null;
   }
   if (response.status === 401 || response.status === 403) {
-    return "Token is invalid.";
+    return "Token not recognized. Generate a new one with `openclaw dashboard --no-open`";
   }
-  return `Unable to validate token (HTTP ${response.status}).`;
+  return `Unable to validate token (HTTP ${response.status}). Check that the gateway is running with \`openclaw status\``;
 }
 
 type LocalAuthLoginProps = {
@@ -173,13 +173,21 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
             </div>
 
             {error ? (
-              <p
+              <div
                 id="local-auth-error"
                 role="alert"
-                className="rounded-lg border border-danger bg-danger-soft px-3 py-2 text-sm text-danger"
+                className="rounded-lg border-l-4 border-[color:var(--danger)] bg-[rgba(239,68,68,0.08)] px-4 py-3 text-sm text-[color:var(--text)] dark:bg-[rgba(239,68,68,0.12)]"
               >
-                {error}
-              </p>
+                {error.split(/`([^`]+)`/).map((part, i) =>
+                  i % 2 === 1 ? (
+                    <code key={i} className="rounded bg-[color:var(--surface-strong)] px-1.5 py-0.5 font-mono text-xs">
+                      {part}
+                    </code>
+                  ) : (
+                    <span key={i}>{part}</span>
+                  )
+                )}
+              </div>
             ) : (
               <p id="local-auth-hint" className="text-xs text-muted">
                 Access token must be at least {LOCAL_AUTH_TOKEN_MIN_LENGTH} characters.
@@ -210,15 +218,20 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
               {isValidating ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                  Validating…
+                  Connecting…
                 </>
               ) : (
-                "Continue"
+                "Connect to Gateway"
               )}
             </Button>
           </form>
         </CardContent>
       </Card>
+
+      {/* Footer */}
+      <p className="relative mt-6 text-center text-xs text-[color:var(--text-quiet)]">
+        Powered by OpenClaw
+      </p>
     </div>
   );
 }
