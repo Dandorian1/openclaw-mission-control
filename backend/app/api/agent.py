@@ -268,6 +268,39 @@ def _guard_task_access(agent_ctx: AgentAuthContext, task: Task) -> None:
     OpenClawAuthorizationPolicy.require_board_write_access(allowed=False)
 
 
+async def _guard_task_access_with_assignment(
+    agent_ctx: AgentAuthContext,
+    task: Task,
+    session: AsyncSession,
+) -> None:
+    """Guard task write access, allowing cross-board writes for assigned agents.
+
+    Workers can write to tasks on other boards if they are assigned via
+    the task_assignments junction table.
+    """
+    agent = agent_ctx.agent
+    if not (agent.board_id and task.board_id):
+        return
+    if agent.board_id == task.board_id:
+        return
+    if agent.is_board_lead:
+        return
+    # Cross-board worker: check if assigned via junction table
+    from app.models.task_assignments import TaskAssignment
+
+    result = await session.execute(
+        select(TaskAssignment.id)
+        .where(
+            TaskAssignment.task_id == task.id,
+            TaskAssignment.agent_id == agent.id,
+        )
+        .limit(1)
+    )
+    if result.scalar_one_or_none() is not None:
+        return  # Agent is assigned — allow access
+    OpenClawAuthorizationPolicy.require_board_write_access(allowed=False)
+
+
 async def _guard_task_read_access(
     agent_ctx: AgentAuthContext,
     task: Task,
@@ -1063,7 +1096,7 @@ async def update_task(
     Supports status, assignment, dependencies, and optional inline comment.
     """
     await _require_board_not_paused(task.board_id, session)
-    _guard_task_access(agent_ctx, task)
+    await _guard_task_access_with_assignment(agent_ctx, task, session)
     return await tasks_api.update_task(
         payload=payload,
         task=task,
@@ -1187,7 +1220,7 @@ async def create_task_comment(
     This is the primary collaboration/log surface for task progress.
     """
     await _require_board_not_paused(task.board_id, session)
-    _guard_task_access(agent_ctx, task)
+    await _guard_task_access_with_assignment(agent_ctx, task, session)
     return await tasks_api.create_task_comment(
         payload=payload,
         task=task,
