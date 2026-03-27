@@ -475,11 +475,69 @@ function ChatPanel({
 export default function OfficePage() {
   const { isSignedIn } = useAuth();
 
-  // State for interactive features
-  const [tableAttendees, setTableAttendees] = useState<Set<string>>(new Set());
-  const [isMeeting, setIsMeeting] = useState(false);
-  const [allWorking, setAllWorking] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
+  // ---------------------------------------------------------------------------
+  // Persist meeting state across page navigations via sessionStorage
+  // ---------------------------------------------------------------------------
+  const STORAGE_KEY = "office-meeting-state";
+
+  const loadPersistedState = useCallback(() => {
+    try {
+      const raw = sessionStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as {
+        attendees?: string[];
+        isMeeting?: boolean;
+        allWorking?: boolean;
+        chatOpen?: boolean;
+      };
+      return parsed;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const persistState = useCallback(
+    (attendees: Set<string>, meeting: boolean, working: boolean, chat: boolean) => {
+      try {
+        sessionStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            attendees: [...attendees],
+            isMeeting: meeting,
+            allWorking: working,
+            chatOpen: chat,
+          }),
+        );
+      } catch {
+        // silent — sessionStorage may be unavailable
+      }
+    },
+    [],
+  );
+
+  // Initialize from sessionStorage
+  const [tableAttendees, setTableAttendees] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    const saved = loadPersistedState();
+    return saved?.attendees ? new Set(saved.attendees) : new Set();
+  });
+  const [isMeeting, setIsMeeting] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return loadPersistedState()?.isMeeting ?? false;
+  });
+  const [allWorking, setAllWorking] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return loadPersistedState()?.allWorking ?? false;
+  });
+  const [chatOpen, setChatOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return loadPersistedState()?.chatOpen ?? false;
+  });
+
+  // Persist whenever state changes
+  useEffect(() => {
+    persistState(tableAttendees, isMeeting, allWorking, chatOpen);
+  }, [tableAttendees, isMeeting, allWorking, chatOpen, persistState]);
 
   const agentsQuery = useListAgentsApiV1AgentsGet<listAgentsApiV1AgentsGetResponse>(
     undefined,
