@@ -1243,6 +1243,27 @@ def _task_list_statement(
     return statement.order_by(col(Task.created_at).desc())
 
 
+async def _task_assignments_by_task_id(
+    session: AsyncSession,
+    *,
+    task_ids: Sequence[UUID],
+) -> dict[UUID, list[UUID]]:
+    """Batch-load assigned agent IDs for multiple tasks."""
+    if not task_ids:
+        return {}
+    from app.models.task_assignments import TaskAssignment
+
+    result = await session.execute(
+        select(TaskAssignment.task_id, TaskAssignment.agent_id)
+        .where(TaskAssignment.task_id.in_(task_ids))  # type: ignore[union-attr]
+        .order_by(TaskAssignment.created_at)
+    )
+    assignments: dict[UUID, list[UUID]] = {}
+    for task_id, agent_id in result.all():
+        assignments.setdefault(task_id, []).append(agent_id)
+    return assignments
+
+
 async def _task_read_page(
     *,
     session: AsyncSession,
@@ -1275,6 +1296,11 @@ async def _task_read_page(
         board_id=board_id,
         task_ids=task_ids,
     )
+    # Batch-load multi-agent assignments
+    assignments_map = await _task_assignments_by_task_id(
+        session,
+        task_ids=task_ids,
+    )
 
     output: list[TaskRead] = []
     for task in tasks:
@@ -1286,6 +1312,7 @@ async def _task_read_page(
         )
         if task.status in ("done", "wont_do"):
             blocked_by = []
+        assignment_ids = assignments_map.get(task.id, [])
         output.append(
             TaskRead.model_validate(task, from_attributes=True).model_copy(
                 update={
@@ -1295,6 +1322,8 @@ async def _task_read_page(
                     "blocked_by_task_ids": blocked_by,
                     "is_blocked": bool(blocked_by),
                     "custom_field_values": custom_field_values_by_task_id.get(task.id, {}),
+                    "assigned_agent_ids": assignment_ids,
+                    "assigned_agent_id": assignment_ids[0] if assignment_ids else task.assigned_agent_id,
                 },
             ),
         )
@@ -1561,6 +1590,15 @@ async def create_task(
     )
     await session.commit()
     await session.refresh(task)
+
+    # Sync junction table: use assigned_agent_ids if provided, else fall back
+    # to assigned_agent_id for backward compat
+    await _sync_task_assignments(
+        session,
+        task_id=task.id,
+        assigned_agent_ids=payload.assigned_agent_ids,
+        assigned_agent_id=task.assigned_agent_id,
+    )
 
     record_activity(
         session,
@@ -1971,6 +2009,83 @@ async def _task_blocked_ids(
     )
 
 
+async def _task_assignment_agent_ids(
+    session: AsyncSession,
+    *,
+    task_id: UUID,
+) -> list[UUID]:
+    """Load assigned agent IDs from the task_assignments junction table."""
+    from app.models.task_assignments import TaskAssignment
+
+    result = await session.execute(
+        select(TaskAssignment.agent_id)
+        .where(TaskAssignment.task_id == task_id)
+        .order_by(TaskAssignment.created_at)
+    )
+    return list(result.scalars().all())
+
+
+async def _sync_task_assignments(
+    session: AsyncSession,
+    *,
+    task_id: UUID,
+    assigned_agent_ids: list[UUID] | None = None,
+    assigned_agent_id: UUID | None = None,
+) -> None:
+    """Sync the task_assignments junction table.
+
+    If assigned_agent_ids is provided (non-empty), use it as the source of truth.
+    Otherwise, fall back to assigned_agent_id for backward compat.
+    Also keeps the legacy assigned_agent_id column in sync (first agent).
+    """
+    from app.models.task_assignments import TaskAssignment
+
+    # Determine desired agent IDs
+    desired: list[UUID] = []
+    if assigned_agent_ids:
+        desired = list(assigned_agent_ids)
+    elif assigned_agent_id is not None:
+        desired = [assigned_agent_id]
+
+    # Load current assignments
+    current = await _task_assignment_agent_ids(session, task_id=task_id)
+
+    current_set = set(current)
+    desired_set = set(desired)
+
+    # Remove agents no longer assigned
+    to_remove = current_set - desired_set
+    if to_remove:
+        await session.execute(
+            select(TaskAssignment)
+            .where(
+                TaskAssignment.task_id == task_id,
+                TaskAssignment.agent_id.in_(to_remove),  # type: ignore[union-attr]
+            )
+        )
+        from sqlalchemy import delete as sa_delete
+        await session.execute(
+            sa_delete(TaskAssignment).where(
+                TaskAssignment.task_id == task_id,
+                TaskAssignment.agent_id.in_(to_remove),  # type: ignore[union-attr]
+            )
+        )
+
+    # Add new assignments
+    to_add = desired_set - current_set
+    for agent_id in to_add:
+        session.add(TaskAssignment(task_id=task_id, agent_id=agent_id))
+
+    # Keep legacy column in sync: first assigned agent
+    task = await session.get(Task, task_id)
+    if task is not None:
+        task.assigned_agent_id = desired[0] if desired else None
+        session.add(task)
+
+    if to_remove or to_add:
+        await session.flush()
+
+
 async def _task_read_response(
     session: AsyncSession,
     *,
@@ -1992,6 +2107,8 @@ async def _task_read_response(
         board_id=board_id,
         task_ids=[task.id],
     )
+    # Load multi-agent assignments from junction table
+    assignment_ids = await _task_assignment_agent_ids(session, task_id=task.id)
     if task.status in ("done", "wont_do"):
         blocked_ids = []
     return TaskRead.model_validate(task, from_attributes=True).model_copy(
@@ -2002,6 +2119,9 @@ async def _task_read_response(
             "blocked_by_task_ids": blocked_ids,
             "is_blocked": bool(blocked_ids),
             "custom_field_values": custom_field_values_by_task_id.get(task.id, {}),
+            "assigned_agent_ids": assignment_ids,
+            # Backward compat: assigned_agent_id = first agent
+            "assigned_agent_id": assignment_ids[0] if assignment_ids else task.assigned_agent_id,
         },
     )
 
@@ -2810,6 +2930,23 @@ async def _finalize_updated_task(
         )
 
     session.add(update.task)
+
+    # Sync junction table if assigned_agent_ids was explicitly set in the update
+    assigned_agent_ids_update = update.updates.pop("assigned_agent_ids", None)
+    if assigned_agent_ids_update is not None:
+        await _sync_task_assignments(
+            session,
+            task_id=update.task.id,
+            assigned_agent_ids=assigned_agent_ids_update,
+        )
+    elif "assigned_agent_id" in update.updates:
+        # Backward compat: single agent assignment via legacy field
+        await _sync_task_assignments(
+            session,
+            task_id=update.task.id,
+            assigned_agent_id=update.task.assigned_agent_id,
+        )
+
     await session.commit()
     await session.refresh(update.task)
     await _record_task_comment_from_update(session, update=update)

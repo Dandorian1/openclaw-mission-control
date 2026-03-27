@@ -29,7 +29,8 @@ class TaskBase(SQLModel):
     status: TaskStatus = "inbox"
     priority: TaskPriority = "medium"
     due_at: datetime | None = None
-    assigned_agent_id: UUID | None = None
+    assigned_agent_id: UUID | None = None  # Deprecated: use assigned_agent_ids
+    assigned_agent_ids: list[UUID] = Field(default_factory=list)
     depends_on_task_ids: list[UUID] = Field(default_factory=list)
     tag_ids: list[UUID] = Field(default_factory=list)
 
@@ -49,7 +50,8 @@ class TaskUpdate(SQLModel):
     status: TaskStatus | None = None
     priority: TaskPriority | None = None
     due_at: datetime | None = None
-    assigned_agent_id: UUID | None = None
+    assigned_agent_id: UUID | None = None  # Deprecated: use assigned_agent_ids
+    assigned_agent_ids: list[UUID] | None = None
     depends_on_task_ids: list[UUID] | None = None
     tag_ids: list[UUID] | None = None
     custom_field_values: TaskCustomFieldValues | None = None
@@ -86,6 +88,8 @@ class TaskRead(TaskBase):
     is_blocked: bool = False
     tags: list[TagRef] = Field(default_factory=list)
     custom_field_values: TaskCustomFieldValues | None = None
+    # assigned_agent_ids is populated from junction table
+    # assigned_agent_id is deprecated but still populated (first agent)
 
 
 class TaskCommentCreate(SQLModel):

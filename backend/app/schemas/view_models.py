@@ -55,7 +55,8 @@ class BoardGroupTaskSummary(SQLModel):
     title: str
     status: str
     priority: str
-    assigned_agent_id: UUID | None = None
+    assigned_agent_id: UUID | None = None  # Deprecated: use assigned_agent_ids
+    assigned_agent_ids: list[UUID] = Field(default_factory=list)
     assignee: str | None = None
     due_at: datetime | None = None
     in_progress_at: datetime | None = None

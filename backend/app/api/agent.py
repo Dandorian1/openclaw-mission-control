@@ -961,6 +961,15 @@ async def create_task(
     )
     await session.commit()
     await session.refresh(task)
+
+    # Sync junction table for multi-agent assignments
+    await tasks_api._sync_task_assignments(
+        session,
+        task_id=task.id,
+        assigned_agent_ids=payload.assigned_agent_ids,
+        assigned_agent_id=task.assigned_agent_id,
+    )
+
     record_activity(
         session,
         event_type="task.created",
