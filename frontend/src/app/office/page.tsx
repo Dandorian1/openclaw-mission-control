@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/clerk";
 import {
   type listAgentsApiV1AgentsGetResponse,
@@ -16,7 +16,13 @@ import {
   type listActivityApiV1ActivityGetResponse,
   useListActivityApiV1ActivityGet,
 } from "@/api/generated/activity/activity";
-import type { AgentRead, BoardRead } from "@/api/generated/model";
+import {
+  listBoardMemoryApiV1BoardsBoardIdMemoryGet,
+} from "@/api/generated/board-memory/board-memory";
+import {
+  createBoardMemoryApiV1BoardsBoardIdMemoryPost,
+} from "@/api/generated/board-memory/board-memory";
+import type { AgentRead, BoardRead, BoardMemoryRead } from "@/api/generated/model";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import {
   Building2,
@@ -284,51 +290,177 @@ const ActivityFeed = memo(function ActivityFeed({
 // Chat Panel (slide-out)
 // ---------------------------------------------------------------------------
 
-function ChatPanel({ onClose, agents }: { onClose: () => void; agents: AgentRead[] }) {
+function ChatPanel({
+  onClose,
+  agents,
+  boards,
+}: {
+  onClose: () => void;
+  agents: AgentRead[];
+  boards: BoardRead[];
+}) {
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<Array<{ from: string; text: string; time: string }>>([
-    { from: "System", text: "Office chat started. Messages are visible to all agents in the room.", time: new Date().toLocaleTimeString() },
-  ]);
+  const [chatMessages, setChatMessages] = useState<BoardMemoryRead[]>([]);
+  const [isSending, setIsSending] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedBoardId, setSelectedBoardId] = useState<string>("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const handleSend = () => {
-    if (!message.trim()) return;
-    setMessages((prev) => [...prev, { from: "You", text: message, time: new Date().toLocaleTimeString() }]);
-    setMessage("");
-  };
+  // Default to first board
+  useEffect(() => {
+    if (!selectedBoardId && boards.length > 0) {
+      setSelectedBoardId(boards[0]!.id);
+    }
+  }, [boards, selectedBoardId]);
+
+  // Load chat messages
+  const loadMessages = useCallback(async () => {
+    if (!selectedBoardId) return;
+    try {
+      const res = await listBoardMemoryApiV1BoardsBoardIdMemoryGet(
+        selectedBoardId,
+        { is_chat: true, limit: 50 },
+      );
+      if (res.status === 200) {
+        const items = (res.data as { items?: BoardMemoryRead[] })?.items ?? [];
+        const sorted = [...items].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        );
+        setChatMessages(sorted);
+      }
+    } catch {
+      // silent
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedBoardId]);
+
+  // Initial load + polling
+  useEffect(() => {
+    setIsLoading(true);
+    setChatMessages([]);
+    void loadMessages();
+    pollRef.current = setInterval(() => void loadMessages(), 5_000);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [loadMessages]);
+
+  // Auto-scroll on new messages
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [chatMessages.length]);
+
+  const handleSend = useCallback(async () => {
+    if (!message.trim() || !selectedBoardId || isSending) return;
+    setIsSending(true);
+    try {
+      const res = await createBoardMemoryApiV1BoardsBoardIdMemoryPost(
+        selectedBoardId,
+        { content: message.trim(), tags: ["chat"], source: "Office Chat" },
+      );
+      if (res.status === 200) {
+        setMessage("");
+        void loadMessages();
+      }
+    } catch {
+      // silent
+    } finally {
+      setIsSending(false);
+    }
+  }, [message, selectedBoardId, isSending, loadMessages]);
+
+  // Build agent name map for display
+  const agentNameMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of agents) m.set(a.id, a.name);
+    return m;
+  }, [agents]);
 
   return (
     <div className="flex h-full flex-col border-l border-[color:var(--border)] bg-[color:var(--surface)]">
+      {/* Header */}
       <div className="flex items-center justify-between border-b border-[color:var(--border)] px-4 py-3">
         <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted">
           <MessageCircle className="h-3.5 w-3.5" />
-          Office Chat
+          Board Chat
         </h3>
         <button onClick={onClose} className="text-muted hover:text-strong transition">
           <X className="h-4 w-4" />
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {messages.map((msg, i) => (
-          <div key={i} className="rounded-lg bg-[color:var(--surface-muted)] px-3 py-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-strong">{msg.from}</span>
-              <span className="text-[9px] text-muted">{msg.time}</span>
-            </div>
-            <p className="text-xs text-strong mt-0.5">{msg.text}</p>
+
+      {/* Board selector */}
+      {boards.length > 1 && (
+        <div className="border-b border-[color:var(--border)] px-4 py-2">
+          <select
+            value={selectedBoardId}
+            onChange={(e) => setSelectedBoardId(e.target.value)}
+            className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-1 text-[11px] text-strong"
+          >
+            {boards.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Messages */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2">
+        {isLoading ? (
+          <div className="space-y-2 pt-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-12 animate-pulse rounded-lg bg-[color:var(--surface-strong)]" />
+            ))}
           </div>
-        ))}
+        ) : chatMessages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-muted">
+            <MessageCircle className="h-6 w-6 opacity-30 mb-2" />
+            <p className="text-[11px]">No messages yet</p>
+            <p className="text-[10px] mt-0.5">Start the conversation!</p>
+          </div>
+        ) : (
+          chatMessages.map((msg) => (
+            <div key={msg.id} className="rounded-lg bg-[color:var(--surface-muted)] px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-strong">
+                  {msg.source ?? "Unknown"}
+                </span>
+                <span className="text-[9px] text-muted">
+                  {timeAgo(msg.created_at)}
+                </span>
+              </div>
+              <p className="text-xs text-strong mt-0.5 whitespace-pre-wrap break-words">
+                {msg.content}
+              </p>
+            </div>
+          ))
+        )}
       </div>
+
+      {/* Input */}
       <div className="border-t border-[color:var(--border)] p-3">
         <div className="flex gap-2">
           <input
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void handleSend();
+              }
+            }}
             placeholder="Type a message..."
-            className="flex-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-1.5 text-xs text-strong placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-indigo-400"
+            disabled={isSending}
+            className="flex-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-1.5 text-xs text-strong placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:opacity-50"
           />
-          <button onClick={handleSend} className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition">
-            Send
+          <button
+            onClick={() => void handleSend()}
+            disabled={isSending || !message.trim()}
+            className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition disabled:opacity-50"
+          >
+            {isSending ? "..." : "Send"}
           </button>
         </div>
       </div>
@@ -610,7 +742,7 @@ export default function OfficePage() {
           {/* Right panel: Chat or Activity */}
           <div className="hidden w-72 shrink-0 lg:block">
             {chatOpen ? (
-              <ChatPanel onClose={() => setChatOpen(false)} agents={agents} />
+              <ChatPanel onClose={() => setChatOpen(false)} agents={agents} boards={boards} />
             ) : (
               <ActivityFeed events={activityEvents} isLoading={activityQuery.isLoading} />
             )}
