@@ -314,7 +314,7 @@ function ChatPanel({
     }
   }, [boards, selectedBoardId]);
 
-  // Load office meeting chat messages (filtered by "office-meeting" tag)
+  // Load chat messages — shows ALL board chat messages (not just office-meeting tagged)
   const loadMessages = useCallback(async () => {
     if (!selectedBoardId) return;
     try {
@@ -329,7 +329,7 @@ function ChatPanel({
           );
           if (res.status === 200) {
             const items = (res.data as { items?: BoardMemoryRead[] })?.items ?? [];
-            allMessages.push(...items.filter((m) => m.tags?.includes("office-meeting")));
+            allMessages.push(...items);
           }
         }
       } else {
@@ -340,7 +340,7 @@ function ChatPanel({
         );
         if (res.status === 200) {
           const items = (res.data as { items?: BoardMemoryRead[] })?.items ?? [];
-          allMessages.push(...items.filter((m) => m.tags?.includes("office-meeting")));
+          allMessages.push(...items);
         }
       }
       
@@ -443,8 +443,8 @@ function ChatPanel({
         ) : chatMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-muted">
             <MessageCircle className="h-6 w-6 opacity-30 mb-2" />
-            <p className="text-[11px]">No meeting messages yet</p>
-            <p className="text-[10px] mt-0.5">Messages here are separate from board chat.</p>
+            <p className="text-[11px]">No messages yet</p>
+            <p className="text-[10px] mt-0.5">Board chat messages will appear here.</p>
           </div>
         ) : (
           chatMessages.map((msg) => (
