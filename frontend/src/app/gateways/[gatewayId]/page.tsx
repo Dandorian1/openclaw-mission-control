@@ -25,7 +25,7 @@ import {
   type getGatewayApiV1GatewaysGatewayIdGetResponse,
   useGatewaysStatusApiV1GatewaysStatusGet,
   useGetGatewayApiV1GatewaysGatewayIdGet,
-  useGatewayModelsApiV1GatewaysModelsGet,
+  useListGatewayModelsApiV1GatewaysModelsGet,
 } from "@/api/generated/gateways/gateways";
 import {
   type listAgentsApiV1AgentsGetResponse,
@@ -169,7 +169,7 @@ export default function GatewayDetailPage() {
   );
 
   // Available models from gateway (for the fallback dropdown)
-  const gatewayModelsQuery = useGatewayModelsApiV1GatewaysModelsGet(
+  const gatewayModelsQuery = useListGatewayModelsApiV1GatewaysModelsGet(
     boardIdForModels ? { board_id: boardIdForModels } : undefined,
     { query: { enabled: Boolean(isSignedIn && isAdmin && gateway && isConnected && boardIdForModels), retry: false } },
   );

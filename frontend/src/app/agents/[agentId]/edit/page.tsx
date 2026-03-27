@@ -17,7 +17,7 @@ import {
   type listBoardsApiV1BoardsGetResponse,
   useListBoardsApiV1BoardsGet,
 } from "@/api/generated/boards/boards";
-import { gatewayModelsApiV1GatewaysModelsGet } from "@/api/generated/gateways/gateways";
+import { listGatewayModelsApiV1GatewaysModelsGet } from "@/api/generated/gateways/gateways";
 import { useQuery } from "@tanstack/react-query";
 import type { AgentRead, AgentUpdate, BoardRead } from "@/api/generated/model";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
@@ -168,7 +168,7 @@ export default function EditAgentPage() {
   const gatewayModelsQuery = useQuery({
     queryKey: ["/api/v1/gateways/models", boardIdForModels] as const,
     queryFn: () =>
-      gatewayModelsApiV1GatewaysModelsGet(
+      listGatewayModelsApiV1GatewaysModelsGet(
         boardIdForModels ? { board_id: boardIdForModels } : undefined,
       ),
     enabled: Boolean(isSignedIn),
