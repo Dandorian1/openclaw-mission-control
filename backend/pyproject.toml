@@ -28,7 +28,7 @@ dependencies = [
     "websockets==16.0",
     "redis==6.3.0",
     "rq==2.6.0",
-    "cryptography==46.0.5",
+    "cryptography==46.0.6",
     "PyJWT==2.12.0",
 ]
 
