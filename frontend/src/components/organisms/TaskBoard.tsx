@@ -29,6 +29,8 @@ type Task = {
   depends_on_task_ids?: string[];
   blocked_by_task_ids?: string[];
   is_blocked?: boolean;
+  updated_at?: string | null;
+  created_at?: string | null;
 };
 
 type TaskBoardProps = {
@@ -121,6 +123,13 @@ type CardPosition = { left: number; top: number };
 const KANBAN_MOVE_ANIMATION_MS = 240;
 const KANBAN_MOVE_EASING = "cubic-bezier(0.2, 0.8, 0.2, 1)";
 
+/** Maximum number of tasks shown by default in terminal columns (done, wont_do). */
+const TERMINAL_COLUMN_DEFAULT_LIMIT = 10;
+/** How many more tasks to show each time "Show more" is clicked. */
+const TERMINAL_COLUMN_PAGE_SIZE = 10;
+/** Columns that get the default limit. */
+const TERMINAL_STATUSES: Set<TaskStatus> = new Set(["done", "wont_do"]);
+
 /**
  * Kanban-style task board with 4 columns.
  *
@@ -147,6 +156,7 @@ export const TaskBoard = memo(function TaskBoard({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [activeColumn, setActiveColumn] = useState<TaskStatus | null>(null);
   const [reviewBucket, setReviewBucket] = useState<ReviewBucket>("all");
+  const [columnLimits, setColumnLimits] = useState<Record<string, number>>({});
 
   const setCardRef = useCallback(
     (taskId: string) => (node: HTMLDivElement | null) => {
@@ -308,6 +318,14 @@ export const TaskBoard = memo(function TaskBoard({
       const bucket = buckets[task.status] ?? buckets.inbox;
       bucket.push(task);
     });
+    // Sort terminal columns by most recently updated first.
+    for (const status of TERMINAL_STATUSES) {
+      buckets[status].sort((a, b) => {
+        const aTime = parseApiDatetime(a.updated_at)?.getTime() ?? 0;
+        const bTime = parseApiDatetime(b.updated_at)?.getTime() ?? 0;
+        return bTime - aTime;
+      });
+    }
     return buckets;
   }, [tasks]);
 
@@ -498,32 +516,59 @@ export const TaskBoard = memo(function TaskBoard({
             </div>
             <div className="rounded-b-xl border border-t-0 border-[color:var(--border)] bg-[color:var(--surface)] p-3">
               <div className="space-y-3">
-                {filteredTasks.map((task) => {
-                  const dueState = resolveDueState(task);
+                {(() => {
+                  const isTerminal = TERMINAL_STATUSES.has(column.status);
+                  const limit = isTerminal
+                    ? (columnLimits[column.status] ?? TERMINAL_COLUMN_DEFAULT_LIMIT)
+                    : filteredTasks.length;
+                  const visibleTasks = filteredTasks.slice(0, limit);
+                  const hiddenCount = filteredTasks.length - visibleTasks.length;
+
                   return (
-                    <div key={task.id} ref={setCardRef(task.id)}>
-                      <TaskCard
-                        title={task.title}
-                        status={task.status}
-                        priority={task.priority}
-                        assignee={task.assignee ?? undefined}
-                        due={dueState.due}
-                        isOverdue={dueState.isOverdue}
-                        approvalsPendingCount={task.approvals_pending_count}
-                        tags={task.tags}
-                        isBlocked={task.is_blocked}
-                        blockedByCount={task.blocked_by_task_ids?.length ?? 0}
-                        onClick={() => onTaskSelect?.(task)}
-                        draggable={!readOnly && !task.is_blocked}
-                        isDragging={draggingId === task.id}
-                        onDragStart={
-                          readOnly ? undefined : handleDragStart(task)
-                        }
-                        onDragEnd={readOnly ? undefined : handleDragEnd}
-                      />
-                    </div>
+                    <>
+                      {visibleTasks.map((task) => {
+                        const dueState = resolveDueState(task);
+                        return (
+                          <div key={task.id} ref={setCardRef(task.id)}>
+                            <TaskCard
+                              title={task.title}
+                              status={task.status}
+                              priority={task.priority}
+                              assignee={task.assignee ?? undefined}
+                              due={dueState.due}
+                              isOverdue={dueState.isOverdue}
+                              approvalsPendingCount={task.approvals_pending_count}
+                              tags={task.tags}
+                              isBlocked={task.is_blocked}
+                              blockedByCount={task.blocked_by_task_ids?.length ?? 0}
+                              onClick={() => onTaskSelect?.(task)}
+                              draggable={!readOnly && !task.is_blocked}
+                              isDragging={draggingId === task.id}
+                              onDragStart={
+                                readOnly ? undefined : handleDragStart(task)
+                              }
+                              onDragEnd={readOnly ? undefined : handleDragEnd}
+                            />
+                          </div>
+                        );
+                      })}
+                      {hiddenCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setColumnLimits((prev) => ({
+                              ...prev,
+                              [column.status]: limit + TERMINAL_COLUMN_PAGE_SIZE,
+                            }))
+                          }
+                          className="w-full rounded-lg border border-dashed border-[color:var(--border)] px-3 py-2 text-xs font-medium text-muted transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-muted)] hover:text-strong"
+                        >
+                          Show {Math.min(hiddenCount, TERMINAL_COLUMN_PAGE_SIZE)} more · {hiddenCount} remaining
+                        </button>
+                      )}
+                    </>
                   );
-                })}
+                })()}
               </div>
             </div>
           </div>
