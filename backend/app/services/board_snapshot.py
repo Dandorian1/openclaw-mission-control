@@ -23,6 +23,7 @@ from app.services.task_dependencies import (
     dependency_ids_by_task_id,
     dependency_status_by_id,
 )
+from app.api.tasks import _task_assignments_by_task_id
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -61,10 +62,20 @@ def _task_to_card(
     deps_by_task_id: dict[UUID, list[UUID]],
     dependency_status_by_id_map: dict[UUID, str],
     tag_state_by_task_id: dict[UUID, TagState],
+    assignments_by_task_id: dict[UUID, list[UUID]],
 ) -> TaskCardRead:
     card = TaskCardRead.model_validate(task, from_attributes=True)
     approvals_count, approvals_pending_count = counts_by_task_id.get(task.id, (0, 0))
     assignee = agent_name_by_id.get(task.assigned_agent_id) if task.assigned_agent_id else None
+    task_agent_ids = assignments_by_task_id.get(task.id, [])
+    assignees = [
+        agent_name_by_id[aid]
+        for aid in task_agent_ids
+        if aid in agent_name_by_id
+    ]
+    # If no names resolved from junction table but we have a singular assignee, use that.
+    if not assignees and assignee:
+        assignees = [assignee]
     depends_on_task_ids = deps_by_task_id.get(task.id, [])
     tag_state = tag_state_by_task_id.get(task.id, TagState())
     blocked_by_task_ids = blocked_by_dependency_ids(
@@ -76,6 +87,8 @@ def _task_to_card(
     return card.model_copy(
         update={
             "assignee": assignee,
+            "assignees": assignees,
+            "assigned_agent_ids": task_agent_ids,
             "approvals_count": approvals_count,
             "approvals_pending_count": approvals_pending_count,
             "depends_on_task_ids": depends_on_task_ids,
@@ -125,7 +138,27 @@ async def build_board_snapshot(session: AsyncSession, board: Board) -> BoardSnap
         AgentLifecycleService.to_agent_read(AgentLifecycleService.with_computed_status(agent))
         for agent in agents
     ]
-    agent_name_by_id = {agent.id: agent.name for agent in agents}
+    agent_name_by_id: dict[UUID, str] = {agent.id: agent.name for agent in agents}
+
+    # Batch-load multi-agent assignments from junction table.
+    assignments_by_task_id = await _task_assignments_by_task_id(
+        session,
+        task_ids=task_ids,
+    )
+
+    # Resolve names for cross-board agents assigned via the junction table.
+    cross_board_agent_ids: set[UUID] = set()
+    for aids in assignments_by_task_id.values():
+        for aid in aids:
+            if aid not in agent_name_by_id:
+                cross_board_agent_ids.add(aid)
+    if cross_board_agent_ids:
+        cross_agents = (
+            await Agent.objects.filter(col(Agent.id).in_(list(cross_board_agent_ids)))
+            .all(session)
+        )
+        for ca in cross_agents:
+            agent_name_by_id[ca.id] = ca.name
 
     pending_approvals_count = int(
         (
@@ -179,6 +212,7 @@ async def build_board_snapshot(session: AsyncSession, board: Board) -> BoardSnap
             deps_by_task_id=deps_by_task_id,
             dependency_status_by_id_map=dependency_status_by_id_map,
             tag_state_by_task_id=tag_state_by_task_id,
+            assignments_by_task_id=assignments_by_task_id,
         )
         for task in tasks
     ]

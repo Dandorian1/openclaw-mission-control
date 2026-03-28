@@ -9,6 +9,7 @@ interface TaskCardProps {
   status?: TaskStatus;
   priority?: string;
   assignee?: string;
+  assignees?: string[];
   due?: string;
   isOverdue?: boolean;
   approvalsPendingCount?: number;
@@ -27,6 +28,7 @@ export function TaskCard({
   status,
   priority,
   assignee,
+  assignees = [],
   due,
   isOverdue = false,
   approvalsPendingCount = 0,
@@ -159,7 +161,13 @@ export function TaskCard({
       <div className="mt-3 flex items-center justify-between text-xs text-muted">
         <div className="flex items-center gap-2">
           <UserCircle className="h-4 w-4 text-quiet" />
-          <span>{assignee ?? "Unassigned"}</span>
+          <span>
+            {assignees.length > 0
+              ? assignees.length <= 2
+                ? assignees.join(", ")
+                : `${assignees.slice(0, 2).join(", ")} +${assignees.length - 2}`
+              : assignee ?? "Unassigned"}
+          </span>
         </div>
         {due ? (
           <div

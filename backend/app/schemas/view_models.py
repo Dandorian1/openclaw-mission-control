@@ -31,6 +31,7 @@ class TaskCardRead(TaskRead):
     """Task read model enriched with assignee and approval counters."""
 
     assignee: str | None = None
+    assignees: list[str] = Field(default_factory=list)
     approvals_count: int = 0
     approvals_pending_count: int = 0
 

@@ -23,7 +23,9 @@ type Task = {
   description?: string | null;
   due_at?: string | null;
   assigned_agent_id?: string | null;
+  assigned_agent_ids?: string[];
   assignee?: string | null;
+  assignees?: string[];
   approvals_pending_count?: number;
   tags?: Array<{ id: string; name: string; slug: string; color: string }>;
   depends_on_task_ids?: string[];
@@ -535,6 +537,7 @@ export const TaskBoard = memo(function TaskBoard({
                               status={task.status}
                               priority={task.priority}
                               assignee={task.assignee ?? undefined}
+                              assignees={task.assignees ?? []}
                               due={dueState.due}
                               isOverdue={dueState.isOverdue}
                               approvalsPendingCount={task.approvals_pending_count}
