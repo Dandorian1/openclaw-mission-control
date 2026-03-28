@@ -2389,8 +2389,13 @@ export default function BoardDetailPage() {
         options.add(agent.name);
       }
     });
+    crossBoardAgents.forEach((agent) => {
+      if (agent.name) {
+        options.add(agent.name);
+      }
+    });
     return [...options];
-  }, [agents]);
+  }, [agents, crossBoardAgents]);
 
   const tagById = useMemo(() => {
     const map = new Map<string, TagRead>();

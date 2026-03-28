@@ -52,6 +52,9 @@ export function TaskCard({
   const priorityBadge = (value?: string) => {
     if (!value) return null;
     const normalized = value.toLowerCase();
+    if (normalized === "critical") {
+      return "bg-red-100 text-red-800 ring-1 ring-red-300";
+    }
     if (normalized === "high") {
       return "bg-rose-100 text-rose-700";
     }
