@@ -2172,7 +2172,7 @@ export default function BoardDetailPage() {
       const created = normalizeTask({
         ...result.data,
         assignee: result.data.assigned_agent_id
-          ? (assigneeById.get(result.data.assigned_agent_id) ?? null)
+          ? (allAssigneeById.get(result.data.assigned_agent_id) ?? null)
           : null,
         approvals_count: 0,
         approvals_pending_count: 0,
@@ -3060,7 +3060,7 @@ export default function BoardDetailPage() {
         ...previous,
         ...result.data,
         assignee: result.data.assigned_agent_id
-          ? (assigneeById.get(result.data.assigned_agent_id) ?? null)
+          ? (allAssigneeById.get(result.data.assigned_agent_id) ?? null)
           : null,
         approvals_count: previous.approvals_count,
         approvals_pending_count: previous.approvals_pending_count,
@@ -4437,7 +4437,7 @@ export default function BoardDetailPage() {
                       isHighlighted={highlightedCommentId === comment.id}
                       authorLabel={
                         comment.agent_id
-                          ? (assigneeById.get(comment.agent_id) ?? "Agent")
+                          ? (allAssigneeById.get(comment.agent_id) ?? "Agent")
                           : currentUserDisplayName
                       }
                     />
