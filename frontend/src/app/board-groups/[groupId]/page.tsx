@@ -17,6 +17,7 @@ import {
 
 import { LoadingState } from "@/components/ui/loading-state";
 import { ErrorState } from "@/components/ui/empty-state";
+import { InlineError } from "@/components/ui/inline-error";
 import { ApiError } from "@/api/mutator";
 import {
   applyBoardGroupHeartbeatApiV1BoardGroupsGroupIdHeartbeatPost,
@@ -957,9 +958,7 @@ export default function BoardGroupDetailPage() {
           <div className="p-4 md:p-8">
             <div className="space-y-6">
               {heartbeatApplyError ? (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 shadow-sm">
-                  {heartbeatApplyError}
-                </div>
+                <InlineError message={heartbeatApplyError} />
               ) : null}
               {heartbeatApplyResult ? (
                 <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4 text-sm text-strong shadow-sm">
@@ -1152,14 +1151,10 @@ export default function BoardGroupDetailPage() {
 
             <div className="flex-1 space-y-4 overflow-y-auto rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
               {chatHistoryQuery.error ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {chatHistoryQuery.error.message}
-                </div>
+                <InlineError size="sm" message={chatHistoryQuery.error.message} />
               ) : null}
               {chatError ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {chatError}
-                </div>
+                <InlineError size="sm" message={chatError} />
               ) : null}
               {chatHistoryQuery.isLoading && chatMessages.length === 0 ? (
                 <LoadingState size="sm" message="Loading messages…" />
@@ -1239,14 +1234,10 @@ export default function BoardGroupDetailPage() {
 
             <div className="flex-1 space-y-4 overflow-y-auto rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
               {notesHistoryQuery.error ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {notesHistoryQuery.error.message}
-                </div>
+                <InlineError size="sm" message={notesHistoryQuery.error.message} />
               ) : null}
               {noteSendError ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {noteSendError}
-                </div>
+                <InlineError size="sm" message={noteSendError} />
               ) : null}
               {notesHistoryQuery.isLoading && notesMessages.length === 0 ? (
                 <LoadingState size="sm" message="Loading notes…" />

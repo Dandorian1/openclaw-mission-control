@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { SignInButton, SignedIn, SignedOut, useAuth } from "@/auth/clerk";
 
+import { InlineError } from "@/components/ui/inline-error";
 import { ApiError } from "@/api/mutator";
 import { useAcceptOrgInviteApiV1OrganizationsInvitesAcceptPost } from "@/api/generated/organizations/organizations";
 import { BrandMark } from "@/components/atoms/BrandMark";
@@ -99,9 +100,7 @@ function InviteContent() {
             />
 
             {error ? (
-              <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-600">
-                {error}
-              </div>
+              <InlineError size="sm" message={error} />
             ) : null}
 
             <SignedOut>

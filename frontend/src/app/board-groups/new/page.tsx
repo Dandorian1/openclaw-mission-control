@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/auth/clerk";
 
+import { InlineError } from "@/components/ui/inline-error";
 import { ApiError } from "@/api/mutator";
 import {
   type listBoardsApiV1BoardsGetResponse,
@@ -181,9 +182,7 @@ export default function NewBoardGroupPage() {
                 Loading boards…
               </div>
             ) : boardsQuery.error ? (
-              <div className="px-4 py-6 text-sm text-rose-700">
-                {boardsQuery.error.message}
-              </div>
+              <InlineError message={boardsQuery.error.message} className="mx-4 my-6" />
             ) : boards.length === 0 ? (
               <div className="px-4 py-6 text-sm text-muted">
                 No boards found.

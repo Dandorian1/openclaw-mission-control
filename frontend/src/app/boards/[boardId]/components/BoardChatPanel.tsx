@@ -3,6 +3,7 @@
 import { memo, type RefObject } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { InlineError } from "@/components/ui/inline-error";
 import { BoardChatComposer } from "@/components/BoardChatComposer";
 import { ChatMessageCard } from "./ChatMessageCard";
 import type { BoardChatMessage } from "../board-types";
@@ -121,9 +122,7 @@ export const BoardChatPanel = memo(function BoardChatPanel({
           {/* Message list */}
           <div className="flex-1 space-y-4 overflow-y-auto rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
             {chatError ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {chatError}
-              </div>
+              <InlineError size="sm" message={chatError} />
             ) : null}
             {chatMessages.length === 0 ? (
               <p className="text-sm text-muted">

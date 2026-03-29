@@ -14,6 +14,7 @@ import {
 
 import { useAuth } from "@/auth/clerk";
 import { LoadingState } from "@/components/ui/loading-state";
+import { InlineError } from "@/components/ui/inline-error";
 import { ApiError, customFetch } from "@/api/mutator";
 import { useOrganizationMembership } from "@/lib/use-organization-membership";
 import {
@@ -634,11 +635,7 @@ export default function UsagePage() {
 
         {/* Error state */}
         {(usageError || usageData?.error) && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900 dark:bg-rose-950">
-            <p className="text-sm text-rose-700 dark:text-rose-300">
-              {usageError || usageData?.error}
-            </p>
-          </div>
+          <InlineError message={usageError || usageData?.error || "Unknown error"} />
         )}
 
         {/* Per-Agent Table */}

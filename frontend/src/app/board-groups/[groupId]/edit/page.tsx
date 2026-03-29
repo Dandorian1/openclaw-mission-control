@@ -7,6 +7,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import { useAuth } from "@/auth/clerk";
 
+import { InlineError } from "@/components/ui/inline-error";
 import { ApiError } from "@/api/mutator";
 import {
   type listBoardsApiV1BoardsGetResponse,
@@ -350,9 +351,7 @@ export default function EditBoardGroupPage() {
                 Loading boards…
               </div>
             ) : boardsError ? (
-              <div className="px-4 py-6 text-sm text-rose-700">
-                {boardsError.message}
-              </div>
+              <InlineError message={boardsError.message} className="mx-4 my-6" />
             ) : boards.length === 0 ? (
               <div className="px-4 py-6 text-sm text-muted">
                 No boards found.
@@ -417,7 +416,7 @@ export default function EditBoardGroupPage() {
           </div>
 
           {assignmentsError ? (
-            <p className="text-sm text-rose-700">{assignmentsError}</p>
+            <InlineError size="sm" message={assignmentsError} />
           ) : null}
           {assignmentsResult ? (
             <p className="text-sm text-strong">

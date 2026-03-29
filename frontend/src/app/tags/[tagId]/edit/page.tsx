@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 
 import { useAuth } from "@/auth/clerk";
 
+import { InlineError } from "@/components/ui/inline-error";
 import { ApiError } from "@/api/mutator";
 import {
   type getTagApiV1TagsTagIdGetResponse,
@@ -64,9 +65,7 @@ export default function EditTagPage() {
           Loading tag…
         </div>
       ) : tagQuery.error ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700 shadow-sm">
-          {tagQuery.error.message}
-        </div>
+        <InlineError message={tagQuery.error.message} />
       ) : !tag ? (
         <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 text-sm text-muted shadow-sm">
           Tag not found.

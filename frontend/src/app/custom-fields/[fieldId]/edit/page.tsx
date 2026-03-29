@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/auth/clerk";
 import { useQueryClient } from "@tanstack/react-query";
 
+import { InlineError } from "@/components/ui/inline-error";
 import { ApiError } from "@/api/mutator";
 import {
   type listBoardsApiV1BoardsGetResponse,
@@ -134,9 +135,7 @@ export default function EditCustomFieldPage() {
         </div>
       ) : null}
       {!customFieldsQuery.isLoading && loadError ? (
-        <div className="max-w-3xl rounded-xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700 shadow-sm">
-          {loadError}
-        </div>
+        <InlineError message={loadError} className="max-w-3xl" />
       ) : null}
       {!customFieldsQuery.isLoading && !loadError && field ? (
         <CustomFieldForm
