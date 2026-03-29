@@ -180,8 +180,29 @@ async def _notify_chat_targets(
         return
 
     mentions = extract_mentions(memory.content)
+
+    # Fetch agents on this board.
+    board_agents = await Agent.objects.filter_by(board_id=board.id).all(session)
+
+    # If the board belongs to a group and there are @mentions, also include
+    # agents from sibling boards so cross-board mentions are delivered.
+    if mentions and board.board_group_id:
+        from app.models.boards import Board as BoardModel
+
+        sibling_boards = await BoardModel.objects.filter_by(
+            board_group_id=board.board_group_id,
+        ).all(session)
+        sibling_board_ids = [
+            b.id for b in sibling_boards if b.id != board.id
+        ]
+        if sibling_board_ids:
+            cross_board_agents = await Agent.objects.by_field_in(
+                "board_id", sibling_board_ids,
+            ).all(session)
+            board_agents = [*board_agents, *cross_board_agents]
+
     targets = _chat_targets(
-        agents=await Agent.objects.filter_by(board_id=board.id).all(session),
+        agents=board_agents,
         mentions=mentions,
         actor=actor,
     )
@@ -192,9 +213,28 @@ async def _notify_chat_targets(
     if len(snippet) > MAX_SNIPPET_LENGTH:
         snippet = f"{snippet[: MAX_SNIPPET_LENGTH - 3]}..."
     base_url = settings.base_url
+    # Cache gateway configs per board for cross-board delivery.
+    config_cache: dict[UUID, GatewayClientConfig | None] = {board.id: config}
+
     for agent in targets.values():
         if not agent.openclaw_session_id:
             continue
+
+        # Resolve the gateway config for this agent's board.
+        agent_board_id = agent.board_id or board.id
+        if agent_board_id not in config_cache:
+            from app.models.boards import Board as BoardModel
+
+            agent_board = await session.get(BoardModel, agent_board_id)
+            config_cache[agent_board_id] = (
+                await dispatch.optional_gateway_config_for_board(agent_board)
+                if agent_board
+                else None
+            )
+        agent_config = config_cache[agent_board_id]
+        if agent_config is None:
+            continue
+
         mentioned = matches_agent_mention(agent, mentions)
         header = "BOARD CHAT MENTION" if mentioned else "BOARD CHAT"
         message = (
@@ -208,7 +248,7 @@ async def _notify_chat_targets(
         )
         error = await dispatch.try_send_agent_message(
             session_key=agent.openclaw_session_id,
-            config=config,
+            config=agent_config,
             agent_name=agent.name,
             message=message,
         )
