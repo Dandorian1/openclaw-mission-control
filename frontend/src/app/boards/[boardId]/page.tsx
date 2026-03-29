@@ -191,6 +191,7 @@ import { ChatMessageCard } from "./components/ChatMessageCard";
 import { BoardChatPanel } from "./components/BoardChatPanel";
 import { LiveFeedCard } from "./components/LiveFeedCard";
 import { TaskDetailPanel } from "./components/TaskDetailPanel";
+import { useRefSync } from "./board-hooks";
 
 export default function BoardDetailPage() {
   const router = useRouter();
@@ -301,7 +302,9 @@ export default function BoardDetailPage() {
 
   const [board, setBoard] = useState<Board | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const tasksRef = useRefSync(tasks);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const agentsRef = useRefSync(agents);
   const [groupSnapshot, setGroupSnapshot] = useState<BoardGroupSnapshot | null>(
     null,
   );
@@ -318,7 +321,7 @@ export default function BoardDetailPage() {
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
   const [liveFeed, setLiveFeed] = useState<LiveFeedItem[]>([]);
-  const liveFeedRef = useRef<LiveFeedItem[]>([]);
+  const liveFeedRef = useRefSync(liveFeed);
   const liveFeedFlashTimersRef = useRef<Record<string, number>>({});
   const [liveFeedFlashIds, setLiveFeedFlashIds] = useState<
     Record<string, boolean>
@@ -398,13 +401,11 @@ export default function BoardDetailPage() {
   );
 
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const tasksRef = useRef<Task[]>([]);
-  const approvalsRef = useRef<Approval[]>([]);
-  const agentsRef = useRef<Agent[]>([]);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const [approvals, setApprovals] = useState<Approval[]>([]);
+  const approvalsRef = useRefSync(approvals);
   const [isApprovalsLoading, setIsApprovalsLoading] = useState(false);
   const [approvalsError, setApprovalsError] = useState<string | null>(null);
   const [approvalsUpdatingId, setApprovalsUpdatingId] = useState<string | null>(
@@ -433,7 +434,7 @@ export default function BoardDetailPage() {
       return next;
     });
   }, []);
-  const chatMessagesRef = useRef<BoardChatMessage[]>([]);
+  const chatMessagesRef = useRefSync(chatMessages);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const [isAgentsControlDialogOpen, setIsAgentsControlDialogOpen] =
     useState(false);
@@ -449,7 +450,7 @@ export default function BoardDetailPage() {
   const [viewMode, setViewMode] = useState<"board" | "list">("board");
   const [isLiveFeedOpen, setIsLiveFeedOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const isLiveFeedOpenRef = useRef(false);
+  const isLiveFeedOpenRef = useRefSync(isLiveFeedOpen);
   const toastIdRef = useRef(0);
   const toastTimersRef = useRef<Record<number, number>>({});
   const pushLiveFeed = useCallback((item: LiveFeedItem) => {
@@ -850,32 +851,8 @@ export default function BoardDetailPage() {
   }, [loadBoard]);
 
   useEffect(() => {
-    tasksRef.current = tasks;
-  }, [tasks]);
-
-  useEffect(() => {
-    approvalsRef.current = approvals;
-  }, [approvals]);
-
-  useEffect(() => {
-    agentsRef.current = agents;
-  }, [agents]);
-
-  useEffect(() => {
     selectedTaskIdRef.current = selectedTask?.id ?? null;
   }, [selectedTask?.id]);
-
-  useEffect(() => {
-    chatMessagesRef.current = chatMessages;
-  }, [chatMessages]);
-
-  useEffect(() => {
-    liveFeedRef.current = liveFeed;
-  }, [liveFeed]);
-
-  useEffect(() => {
-    isLiveFeedOpenRef.current = isLiveFeedOpen;
-  }, [isLiveFeedOpen]);
 
   useEffect(() => {
     if (!isChatOpen) return;
