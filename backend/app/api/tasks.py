@@ -2206,8 +2206,13 @@ def _lead_requested_fields(update: _TaskUpdateInput) -> set[str]:
 
 def _validate_lead_update_request(update: _TaskUpdateInput) -> None:
     allowed_fields = {
-        "assigned_agent_id",
+        "title",
+        "description",
         "status",
+        "priority",
+        "due_at",
+        "assigned_agent_id",
+        "assigned_agent_ids",
         "depends_on_task_ids",
         "tag_ids",
         "custom_field_values",
@@ -2526,6 +2531,13 @@ async def _apply_lead_task_update(
         )
         if attempted_transition:
             raise _blocked_task_error(blocked_by)
+
+    # Apply scalar field updates (title, description, priority, due_at)
+    # before assignment/status logic so the task object reflects all changes.
+    _scalar_fields = {"title", "description", "priority", "due_at"}
+    for key in _scalar_fields:
+        if key in update.updates:
+            setattr(update.task, key, update.updates[key])
 
     await _lead_apply_assignment(session, update=update)
     await _lead_apply_status(session, update=update)
