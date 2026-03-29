@@ -10,10 +10,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
-from pathlib import Path
-
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import asc, desc, or_
 from sqlmodel import col, func, select
 from sse_starlette.sse import EventSourceResponse
@@ -41,7 +38,6 @@ from app.models.task_custom_fields import (
     TaskCustomFieldDefinition,
     TaskCustomFieldValue,
 )
-from app.models.task_attachments import TaskAttachment
 from app.models.task_dependencies import TaskDependency
 from app.models.task_fingerprints import TaskFingerprint
 from app.models.tasks import Task
@@ -54,17 +50,13 @@ from app.schemas.task_custom_fields import (
     TaskCustomFieldValues,
     validate_custom_field_value,
 )
-from app.schemas.tasks import TaskAttachmentRead, TaskCommentCreate, TaskCommentRead, TaskCreate, TaskRead, TaskUpdate
+from app.schemas.tasks import TaskCommentCreate, TaskCommentRead, TaskCreate, TaskRead, TaskUpdate
 from app.services.activity_log import record_activity
 from app.services.approval_task_links import (
     load_task_ids_by_approval,
     pending_approval_conflicts_by_task,
 )
-from app.services.mentions import extract_mentions, matches_agent_mention
-from app.services.openclaw.gateway_dispatch import GatewayDispatchService
-from app.services.openclaw.gateway_rpc import GatewayConfig as GatewayClientConfig
-from app.services.openclaw.gateway_rpc import OpenClawGatewayError
-from app.services.openclaw.provisioning_db import AgentLifecycleService
+
 from app.services.organizations import require_board_access
 from app.services.tags import (
     TagState,
@@ -145,8 +137,6 @@ router.include_router(comments_attachments_router)
 
 # Constants
 SSE_SEEN_MAX = 2000
-TASK_SNIPPET_MAX_LEN = 500
-TASK_SNIPPET_TRUNCATED_LEN = 497
 
 # Dependencies
 BOARD_READ_DEP = Depends(get_board_for_actor_read)
@@ -340,12 +330,6 @@ async def _require_no_pending_approval_for_status_change_when_enabled(
     ):
         raise _pending_approval_blocks_status_change_error()
 
-
-def _truncate_snippet(value: str) -> str:
-    text = value.strip()
-    if len(text) <= TASK_SNIPPET_MAX_LEN:
-        return text
-    return f"{text[:TASK_SNIPPET_TRUNCATED_LEN]}..."
 
 
 async def has_valid_recent_comment(

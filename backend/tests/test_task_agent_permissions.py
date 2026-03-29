@@ -10,6 +10,7 @@ from sqlmodel import SQLModel, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api import tasks as tasks_api
+from app.api import task_notifications as task_notifications_api
 from app.api.deps import ActorContext
 from app.core.time import utcnow
 from app.models.activity_events import ActivityEvent
@@ -492,6 +493,9 @@ async def test_non_lead_agent_move_to_review_reassigns_to_lead_and_sends_review_
                 async def optional_gateway_config_for_board(self, _board: Board) -> object:
                     return object()
 
+                async def try_send_agent_message(self, **kwargs) -> None:
+                    return None
+
             async def _fake_send_agent_task_message(
                 *,
                 dispatch: Any,
@@ -506,7 +510,7 @@ async def test_non_lead_agent_move_to_review_reassigns_to_lead_and_sends_review_
                 sent["message"] = message
                 return None
 
-            monkeypatch.setattr(tasks_api, "GatewayDispatchService", _FakeDispatch)
+            monkeypatch.setattr(task_notifications_api, "GatewayDispatchService", _FakeDispatch)
             monkeypatch.setattr(
                 tasks_api, "_send_agent_task_message", _fake_send_agent_task_message
             )
@@ -609,6 +613,9 @@ async def test_lead_moves_review_task_to_inbox_and_reassigns_last_worker_with_re
                 async def optional_gateway_config_for_board(self, _board: Board) -> object:
                     return object()
 
+                async def try_send_agent_message(self, **kwargs) -> None:
+                    return None
+
             async def _fake_send_agent_task_message(
                 *,
                 dispatch: Any,
@@ -627,7 +634,7 @@ async def test_lead_moves_review_task_to_inbox_and_reassigns_last_worker_with_re
                 )
                 return None
 
-            monkeypatch.setattr(tasks_api, "GatewayDispatchService", _FakeDispatch)
+            monkeypatch.setattr(task_notifications_api, "GatewayDispatchService", _FakeDispatch)
             monkeypatch.setattr(
                 tasks_api, "_send_agent_task_message", _fake_send_agent_task_message
             )
