@@ -2418,6 +2418,21 @@ async def _lead_apply_status(
         update.task.status = target_status
         return
 
+    # When the lead IS the assigned agent, allow full workflow transitions
+    # (in_progress → review → done, etc.) — same as a worker on their own tasks.
+    if update.task.assigned_agent_id == lead_agent.id:
+        if target_status == "review":
+            update.task.previous_in_progress_at = update.task.in_progress_at
+            update.task.assigned_agent_id = None
+        elif target_status == "inbox":
+            update.task.in_progress_at = None
+        elif target_status == "wont_do":
+            update.task.previous_in_progress_at = update.task.in_progress_at
+            update.task.assigned_agent_id = None
+            update.task.in_progress_at = None
+        update.task.status = target_status
+        return
+
     # Standard lead gate: leads can only change status from review.
     if update.task.status != "review":
         assigning_agent = "assigned_agent_id" in update.updates and bool(
