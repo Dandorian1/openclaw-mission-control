@@ -23,6 +23,7 @@ import { DashboardSidebar } from "@/components/organisms/DashboardSidebar";
 import { DashboardShell } from "@/components/templates/DashboardShell";
 import { Markdown } from "@/components/atoms/Markdown";
 import { SignedOutPanel } from "@/components/auth/SignedOutPanel";
+import { LoadingState } from "@/components/ui/loading-state";
 import { ApiError } from "@/api/mutator";
 import {
   type dashboardMetricsApiV1MetricsDashboardGetResponse,
@@ -1163,9 +1164,7 @@ export default function DashboardPage() {
                       </Link>
                     </div>
                   ) : gatewayStatusesQuery.isLoading ? (
-                    <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-3 text-sm text-muted">
-                      Loading sessions...
-                    </div>
+                    <LoadingState size="sm" message="Loading sessions…" />
                   ) : sessionSummaries.length > 0 ? (
                     <>
                       {gatewayUnavailableCount > 0 ? (

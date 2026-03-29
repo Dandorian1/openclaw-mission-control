@@ -15,6 +15,8 @@ import {
   X,
 } from "lucide-react";
 
+import { LoadingState } from "@/components/ui/loading-state";
+import { ErrorState } from "@/components/ui/empty-state";
 import { ApiError } from "@/api/mutator";
 import {
   applyBoardGroupHeartbeatApiV1BoardGroupsGroupIdHeartbeatPost,
@@ -973,13 +975,12 @@ export default function BoardGroupDetailPage() {
               ) : null}
 
               {snapshotQuery.isLoading ? (
-                <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 text-sm text-muted shadow-sm">
-                  Loading group snapshot…
-                </div>
+                <LoadingState message="Loading group snapshot…" />
               ) : snapshotQuery.error ? (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700 shadow-sm">
-                  {snapshotQuery.error.message}
-                </div>
+                <ErrorState
+                  title="Failed to load group"
+                  description={snapshotQuery.error.message}
+                />
               ) : boards.length === 0 ? (
                 <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 text-sm text-muted shadow-sm">
                   No boards in this group yet. Assign boards from the board
@@ -1161,7 +1162,7 @@ export default function BoardGroupDetailPage() {
                 </div>
               ) : null}
               {chatHistoryQuery.isLoading && chatMessages.length === 0 ? (
-                <p className="text-sm text-muted">Loading…</p>
+                <LoadingState size="sm" message="Loading messages…" />
               ) : chatMessages.length === 0 ? (
                 <p className="text-sm text-muted">
                   No messages yet. Start the conversation with a broadcast or a
@@ -1248,7 +1249,7 @@ export default function BoardGroupDetailPage() {
                 </div>
               ) : null}
               {notesHistoryQuery.isLoading && notesMessages.length === 0 ? (
-                <p className="text-sm text-muted">Loading…</p>
+                <LoadingState size="sm" message="Loading notes…" />
               ) : notesMessages.length === 0 ? (
                 <p className="text-sm text-muted">
                   No notes yet. Post a note or a broadcast to share context

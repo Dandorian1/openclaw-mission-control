@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/auth/clerk";
+import { LoadingState } from "@/components/ui/loading-state";
 import { ApiError, customFetch } from "@/api/mutator";
 import { useOrganizationMembership } from "@/lib/use-organization-membership";
 import {
@@ -575,9 +576,7 @@ export default function UsagePage() {
             </div>
           </div>
         ) : providerLoading ? (
-          <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4 shadow-sm">
-            <p className="text-sm text-muted animate-pulse">Loading provider usage limits…</p>
-          </div>
+          <LoadingState size="sm" message="Loading provider usage limits…" />
         ) : null}
 
         {/* Daily Cost Breakdown */}

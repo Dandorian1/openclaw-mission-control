@@ -9,6 +9,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/auth/clerk";
 import { useQueryClient } from "@tanstack/react-query";
 import { AgentsTable } from "@/components/agents/AgentsTable";
+import { LoadingState } from "@/components/ui/loading-state";
+import { ErrorState } from "@/components/ui/empty-state";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { Button } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
@@ -297,13 +299,12 @@ export default function GatewayDetailPage() {
         adminOnlyMessage="Only organization owners and admins can access gateways."
       >
         {gatewayQuery.isLoading ? (
-          <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 text-sm text-muted shadow-sm">
-            Loading gateway…
-          </div>
+          <LoadingState message="Loading gateway…" />
         ) : gatewayQuery.error ? (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
-            {gatewayQuery.error.message}
-          </div>
+          <ErrorState
+            title="Failed to load gateway"
+            description={gatewayQuery.error.message}
+          />
         ) : gateway ? (
           <div className="space-y-6">
             <div className="grid gap-6 lg:grid-cols-2">

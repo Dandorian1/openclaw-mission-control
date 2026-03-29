@@ -6,6 +6,8 @@ import { memo, useMemo, useRef, useCallback, useLayoutEffect, useState } from "r
 import { useParams } from "next/navigation";
 import { useAuth } from "@/auth/clerk";
 import { ApiError } from "@/api/mutator";
+import { LoadingState } from "@/components/ui/loading-state";
+import { EmptyState, NoResults, ErrorState } from "@/components/ui/empty-state";
 import {
   type getBoardSnapshotApiV1BoardsBoardIdSnapshotGetResponse,
   useGetBoardSnapshotApiV1BoardsBoardIdSnapshotGet,
@@ -559,27 +561,23 @@ export default function TeamPage() {
 
         {/* Loading */}
         {snapshotQuery.isLoading && (
-          <div className="flex flex-wrap justify-center gap-6 py-12">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-52 w-60 animate-pulse rounded-xl bg-[color:var(--surface-strong)]"
-              />
-            ))}
-          </div>
+          <LoadingState message="Loading team…" />
         )}
 
         {/* Error */}
         {snapshotQuery.isError && (
-          <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-400">
-            Failed to load team data.{" "}
-            <button
-              onClick={() => snapshotQuery.refetch()}
-              className="underline"
-            >
-              Retry
-            </button>
-          </div>
+          <ErrorState
+            title="Failed to load team data"
+            description="Something went wrong while fetching agents."
+            action={
+              <button
+                onClick={() => snapshotQuery.refetch()}
+                className="text-sm text-[color:var(--accent)] underline"
+              >
+                Retry
+              </button>
+            }
+          />
         )}
 
         {/* Empty after search */}
@@ -587,27 +585,17 @@ export default function TeamPage() {
           !snapshotQuery.isError &&
           agents.length === 0 &&
           allAgents.length > 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-[color:var(--text-muted)]">
-              <Search className="h-10 w-10 mb-3 opacity-40" />
-              <p className="text-base font-medium">No agents match &ldquo;{search}&rdquo;</p>
-              <button
-                onClick={() => setSearch("")}
-                className="mt-2 text-sm text-[color:var(--accent)] underline"
-              >
-                Clear search
-              </button>
-            </div>
+            <NoResults query={search || undefined} />
           )}
 
-        {/* Empty board */}
+        {/* Empty board — no agents at all */}
         {!snapshotQuery.isLoading &&
           !snapshotQuery.isError &&
           allAgents.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-[color:var(--text-muted)]">
-              <Users className="h-12 w-12 mb-3 opacity-40" />
-              <p className="text-lg font-medium">No agents in this team</p>
-              <p className="text-sm">Add agents to see them here.</p>
-            </div>
+            <EmptyState
+              title="No agents on this board"
+              description="Agents will appear here once they are assigned to this board."
+            />
           )}
 
         {/* Org Chart View */}

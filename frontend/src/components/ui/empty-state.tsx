@@ -100,15 +100,18 @@ export function NoResults({ query }: { query?: string }) {
 export function ErrorState({
   title,
   description,
+  action,
 }: {
   title: string;
   description?: string;
+  action?: React.ReactNode;
 }) {
   return (
     <EmptyState
       type="error"
       title={title}
       description={description}
+      action={action}
     />
   );
 }
