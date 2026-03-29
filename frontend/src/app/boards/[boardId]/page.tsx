@@ -188,6 +188,7 @@ import {
 // ─── Extracted Components ────────────────────────────────────────────
 import { TaskCommentCard } from "./components/TaskCommentCard";
 import { ChatMessageCard } from "./components/ChatMessageCard";
+import { BoardChatPanel } from "./components/BoardChatPanel";
 import { LiveFeedCard } from "./components/LiveFeedCard";
 import { TaskDetailPanel } from "./components/TaskDetailPanel";
 
@@ -3454,91 +3455,21 @@ export default function BoardDetailPage() {
         approvalReason={approvalReason}
       />
 
-      <aside
-        className={cn(
-          "fixed right-0 top-0 z-50 h-full w-full max-w-[96vw] transform border-l border-[color:var(--border)] bg-[color:var(--surface)] shadow-2xl transition-transform md:w-[560px]",
-          isChatOpen ? "transform-none" : "translate-x-full",
-        )}
-      >
-        <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between border-b border-[color:var(--border)] px-4 py-3 md:px-6 md:py-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-                Board chat
-              </p>
-              <p className="mt-1 text-sm font-medium text-strong">
-                Talk to the lead agent. Tag others with @name.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={closeBoardChat}
-              className="rounded-lg border border-[color:var(--border)] p-2 text-muted transition hover:bg-[color:var(--surface-muted)]"
-              aria-label="Close board chat"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="flex flex-1 flex-col overflow-hidden px-6 py-4">
-            {/* Chat panel header with metadata toggle */}
-            <div className="mb-2 flex items-center justify-between border-b border-[color:var(--border)] pb-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted">
-                Board Chat
-              </span>
-              <div className="flex items-center gap-3">
-                {showChatMetadata && sessionStats ? (
-                  <span className="text-xs text-quiet">
-                    Session: {sessionStats.totalTokens.toLocaleString()} tokens
-                    {" · "}
-                    ${sessionStats.totalCost.toFixed(4)}
-                  </span>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={toggleChatMetadata}
-                  className="text-xs text-muted transition-colors hover:text-strong"
-                >
-                  {showChatMetadata ? "Hide metadata" : "Show metadata"}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 space-y-4 overflow-y-auto rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
-              {chatError ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {chatError}
-                </div>
-              ) : null}
-              {chatMessages.length === 0 ? (
-                <p className="text-sm text-muted">
-                  No messages yet. Start the conversation with your lead agent.
-                </p>
-              ) : (
-                chatMessages.map((message) => (
-                  <ChatMessageCard
-                    key={message.id}
-                    message={message}
-                    fallbackSource={currentUserDisplayName}
-                    showMetadata={showChatMetadata}
-                  />
-                ))
-              )}
-              <div ref={chatEndRef} />
-            </div>
-            <BoardChatComposer
-              isSending={isChatSending}
-              onSend={handleSendChat}
-              disabled={!canWrite}
-              mentionSuggestions={boardChatMentionSuggestions}
-              placeholder={
-                canWrite
-                  ? "Message the board lead. Tag agents with @name."
-                  : "Read-only access. Chat is disabled."
-              }
-            />
-          </div>
-        </div>
-      </aside>
+      <BoardChatPanel
+        isOpen={isChatOpen}
+        onClose={closeBoardChat}
+        chatMessages={chatMessages}
+        chatError={chatError}
+        isSending={isChatSending}
+        onSend={handleSendChat}
+        showMetadata={showChatMetadata}
+        onToggleMetadata={toggleChatMetadata}
+        sessionStats={sessionStats}
+        mentionSuggestions={boardChatMentionSuggestions}
+        canWrite={canWrite}
+        currentUserDisplayName={currentUserDisplayName}
+        chatEndRef={chatEndRef}
+      />
 
       <aside
         className={cn(
