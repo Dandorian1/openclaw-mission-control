@@ -157,11 +157,15 @@ async def _notify_chat_targets(
     memory: BoardMemory,
     actor: ActorContext,
 ) -> None:
+    import logging
+    _log = logging.getLogger("board_memory.notify_chat")
+
     if not memory.content:
         return
     dispatch = GatewayDispatchService(session)
     config = await dispatch.optional_gateway_config_for_board(board)
     if config is None:
+        _log.warning("[MENTION-DEBUG] No gateway config for board %s (%s)", board.name, board.id)
         return
 
     normalized = memory.content.strip()
@@ -180,9 +184,14 @@ async def _notify_chat_targets(
         return
 
     mentions = extract_mentions(memory.content)
+    import sys
+    print(f"[MENTION-NOTIFY] Board={board.name}, mentions={mentions}, is_chat=True", file=sys.stderr)
+    _log.warning("[MENTION-DEBUG] Board=%s, mentions=%s, board_group_id=%s, content_preview=%s",
+                 board.name, mentions, board.board_group_id, memory.content[:100])
 
     # Fetch agents on this board.
     board_agents = await Agent.objects.filter_by(board_id=board.id).all(session)
+    _log.warning("[MENTION-DEBUG] Board agents: %s", [(a.name, str(a.id)[:8]) for a in board_agents])
 
     # If the board belongs to a group and there are @mentions, also include
     # agents from sibling boards so cross-board mentions are delivered.
@@ -195,10 +204,13 @@ async def _notify_chat_targets(
         sibling_board_ids = [
             b.id for b in sibling_boards if b.id != board.id
         ]
+        _log.warning("[MENTION-DEBUG] Sibling boards: %s", [(b.name, str(b.id)[:8]) for b in sibling_boards if b.id != board.id])
         if sibling_board_ids:
             cross_board_agents = await Agent.objects.by_field_in(
                 "board_id", sibling_board_ids,
             ).all(session)
+            _log.warning("[MENTION-DEBUG] Cross-board agents: %s",
+                         [(a.name, str(a.board_id)[:8], bool(a.openclaw_session_id)) for a in cross_board_agents])
             board_agents = [*board_agents, *cross_board_agents]
 
     targets = _chat_targets(
@@ -206,6 +218,7 @@ async def _notify_chat_targets(
         mentions=mentions,
         actor=actor,
     )
+    _log.warning("[MENTION-DEBUG] Final targets: %s", [(a.name, str(a.id)[:8]) for a in targets.values()])
     if not targets:
         return
     actor_name = _actor_display_name(actor)
@@ -246,6 +259,8 @@ async def _notify_chat_targets(
             f"POST {base_url}/api/v1/agent/boards/{board.id}/memory\n"
             'Body: {"content":"...","tags":["chat"]}'
         )
+        _log.warning("[MENTION-DEBUG] Sending to %s (session=%s, board=%s)",
+                     agent.name, agent.openclaw_session_id, agent_board_id)
         error = await dispatch.try_send_agent_message(
             session_key=agent.openclaw_session_id,
             config=agent_config,
@@ -253,7 +268,9 @@ async def _notify_chat_targets(
             message=message,
         )
         if error is not None:
+            _log.warning("[MENTION-DEBUG] DELIVERY FAILED to %s: %s", agent.name, error)
             continue
+        _log.warning("[MENTION-DEBUG] Delivered to %s OK", agent.name)
 
 
 @router.get("", response_model=DefaultLimitOffsetPage[BoardMemoryRead])
@@ -264,9 +281,25 @@ async def list_board_memory(
     session: AsyncSession = SESSION_DEP,
     _actor: ActorContext = ACTOR_DEP,
 ) -> LimitOffsetPage[BoardMemoryRead]:
-    """List board memory entries, optionally filtering chat entries."""
+    """List board memory entries, optionally filtering chat entries.
+    
+    For chat view: include chat entries from sibling boards in the same group
+    so cross-board @mentions are visible.
+    """
+    board_ids = [board.id]
+    
+    # If this is chat view and board is grouped, also include sibling board chat.
+    if is_chat and board.board_group_id:
+        from app.models.boards import Board as BoardModel
+        
+        sibling_boards = await BoardModel.objects.filter_by(
+            board_group_id=board.board_group_id,
+        ).all(session)
+        sibling_board_ids = [b.id for b in sibling_boards if b.id != board.id]
+        board_ids.extend(sibling_board_ids)
+    
     statement = (
-        BoardMemory.objects.filter_by(board_id=board.id)
+        BoardMemory.objects.by_field_in("board_id", board_ids)
         # Old/invalid rows (empty/whitespace-only content) can exist; exclude them to
         # satisfy the NonEmptyStr response schema.
         .filter(func.length(func.trim(col(BoardMemory.content))) > 0)
