@@ -22,6 +22,10 @@ from app.api.task_notifications import (
     TASK_SNIPPET_MAX_LEN,
     TASK_SNIPPET_TRUNCATED_LEN,
 )
+from app.core.logging import get_logger
+from app.services.openclaw.gateway_rpc import GatewayConfig as GatewayClientConfig
+
+logger = get_logger(__name__)
 from app.db.pagination import paginate
 from app.db.session import get_session
 from app.models.activity_events import ActivityEvent
@@ -171,7 +175,24 @@ async def comment_targets(
     mention_names = extract_mentions(message)
     targets: dict[UUID, Agent] = {}
     if mention_names and task.board_id:
-        for agent in await Agent.objects.filter_by(board_id=task.board_id).all(session):
+        # Search agents on this board first.
+        board_agents = await Agent.objects.filter_by(board_id=task.board_id).all(session)
+
+        # Also include agents from sibling boards in the same group
+        # so cross-board @mentions are delivered.
+        board = await Board.objects.by_id(task.board_id).first(session)
+        if board and board.board_group_id:
+            sibling_boards = await Board.objects.filter_by(
+                board_group_id=board.board_group_id,
+            ).all(session)
+            sibling_board_ids = [b.id for b in sibling_boards if b.id != board.id]
+            if sibling_board_ids:
+                cross_board_agents = await Agent.objects.by_field_in(
+                    "board_id", sibling_board_ids,
+                ).all(session)
+                board_agents = [*board_agents, *cross_board_agents]
+
+        for agent in board_agents:
             if matches_agent_mention(agent, mention_names):
                 targets[agent.id] = agent
     if not mention_names and task.assigned_agent_id:
@@ -216,9 +237,27 @@ async def notify_task_comment_targets(
 
     snippet = _truncate_snippet(request.message)
     actor_name = _comment_actor_name(request.actor)
+
+    # Cache gateway configs per board for cross-board delivery.
+    config_cache: dict[UUID, GatewayClientConfig | None] = {board.id: config}
+
     for agent in request.targets.values():
         if not agent.openclaw_session_id:
             continue
+
+        # Resolve the gateway config for this agent's board.
+        agent_board_id = agent.board_id or board.id
+        if agent_board_id not in config_cache:
+            agent_board = await Board.objects.by_id(agent_board_id).first(session)
+            config_cache[agent_board_id] = (
+                await dispatch.optional_gateway_config_for_board(agent_board)
+                if agent_board
+                else None
+            )
+        agent_config = config_cache[agent_board_id]
+        if agent_config is None:
+            continue
+
         mentioned = matches_agent_mention(agent, request.mention_names)
         header = "TASK MENTION" if mentioned else "NEW TASK COMMENT"
         action_line = (
@@ -237,13 +276,18 @@ async def notify_task_comment_targets(
             "If you are mentioned but not assigned, reply in the task "
             "thread but do not change task status."
         )
-        await send_agent_task_message(
+        error = await send_agent_task_message(
             dispatch=dispatch,
             session_key=agent.openclaw_session_id,
-            config=config,
+            config=agent_config,
             agent_name=agent.name,
             message=notification,
         )
+        if error is not None:
+            logger.warning(
+                "task.comment.mention.delivery_failed agent=%s task=%s error=%s",
+                agent.name, request.task.id, error,
+            )
 
 
 # ---------------------------------------------------------------------------
