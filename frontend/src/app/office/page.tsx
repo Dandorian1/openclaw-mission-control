@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/clerk";
 import {
   type listAgentsApiV1AgentsGetResponse,
@@ -16,464 +16,224 @@ import {
   type listActivityApiV1ActivityGetResponse,
   useListActivityApiV1ActivityGet,
 } from "@/api/generated/activity/activity";
-import {
-  listBoardGroupMemoryForBoardApiV1BoardsBoardIdGroupMemoryGet,
-  createBoardGroupMemoryForBoardApiV1BoardsBoardIdGroupMemoryPost,
-} from "@/api/generated/board-group-memory/board-group-memory";
-import type { AgentRead, BoardRead, BoardGroupMemoryRead } from "@/api/generated/model";
+import type { AgentRead, BoardRead } from "@/api/generated/model";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
-import {
-  Building2,
-  Briefcase,
-  Users,
-  Play,
-  Pause,
-  MessageCircle,
-  Activity,
-  GripVertical,
-  X,
-} from "lucide-react";
+import { Building2, Briefcase, Users, ClipboardList, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { AgentSprite } from "./components/AgentSprite";
+import { ActivityPanel } from "./components/ActivityPanel";
+import { ChatPanel } from "./components/ChatPanel";
+import { agentActivity, STATUS_DOT, agentDeskPosition, gatherPosition } from "./components/helpers";
+
 // ---------------------------------------------------------------------------
-// Helpers
+// Constants
 // ---------------------------------------------------------------------------
 
-function agentActivity(agent: AgentRead): "active" | "idle" | "offline" {
-  if (agent.status === "online") return "active";
-  if (!agent.last_seen_at) return "offline";
-  const diff = Date.now() - new Date(agent.last_seen_at).getTime();
-  if (diff < 5 * 60_000) return "active";
-  if (diff < 30 * 60_000) return "idle";
-  return "offline";
-}
+const STORAGE_KEY = "office-meeting-state";
+const FLOOR_W = 800;
+const FLOOR_H = 520;
+const TABLE_CX = FLOOR_W / 2;
+const TABLE_CY = FLOOR_H / 2;
+const TABLE_W = 160;
+const TABLE_H = 80;
 
-const STATUS_DOT: Record<string, string> = {
-  active: "bg-emerald-500",
-  idle: "bg-amber-400",
-  offline: "bg-gray-400",
-};
-
-const DESK_COLORS = [
-  "from-blue-500/10 to-blue-600/5",
-  "from-purple-500/10 to-purple-600/5",
-  "from-teal-500/10 to-teal-600/5",
-  "from-rose-500/10 to-rose-600/5",
-  "from-amber-500/10 to-amber-600/5",
-  "from-indigo-500/10 to-indigo-600/5",
-  "from-emerald-500/10 to-emerald-600/5",
-  "from-cyan-500/10 to-cyan-600/5",
+// Furniture positions (static decoration)
+const PLANTS = [
+  { x: 20, y: 20 },
+  { x: FLOOR_W - 50, y: 20 },
+  { x: 20, y: FLOOR_H - 50 },
+  { x: FLOOR_W - 50, y: FLOOR_H - 50 },
 ];
 
-const AGENT_EMOJIS = ["💻", "🖥️", "⌨️", "🔧", "🛡️", "🎨", "📊", "🔬", "📱", "🤖"];
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
-
 // ---------------------------------------------------------------------------
-// Agent Desk (draggable)
+// Office Floor Canvas
 // ---------------------------------------------------------------------------
 
-const AgentDesk = memo(function AgentDesk({
-  agent,
-  index,
-  atTable,
-  onRemoveFromTable,
-}: {
-  agent: AgentRead;
-  index: number;
-  atTable?: boolean;
-  onRemoveFromTable?: () => void;
-}) {
-  const activity = agentActivity(agent);
-  const emoji = AGENT_EMOJIS[index % AGENT_EMOJIS.length];
-  const color = DESK_COLORS[index % DESK_COLORS.length];
-
-  return (
-    <div
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/plain", agent.id);
-        e.dataTransfer.effectAllowed = "move";
-      }}
-      className={cn(
-        "relative flex flex-col items-center gap-1.5 rounded-lg border p-3 transition-all duration-500 cursor-grab active:cursor-grabbing",
-        "border-[color:var(--border)] bg-gradient-to-b",
-        color,
-        atTable && "ring-2 ring-indigo-400 ring-offset-1 dark:ring-offset-gray-900",
-      )}
-      title={`${agent.name} — ${activity} (drag to meeting table)`}
-    >
-      {/* Drag grip */}
-      <GripVertical className="absolute top-1 right-1 h-3 w-3 text-muted opacity-40" />
-
-      {/* Remove from table button */}
-      {atTable && onRemoveFromTable && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onRemoveFromTable(); }}
-          className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-white hover:bg-rose-600 transition"
-          title="Send back to desk"
-        >
-          <X className="h-2.5 w-2.5" />
-        </button>
-      )}
-
-      {/* Desk emoji */}
-      <span className="text-2xl">{emoji}</span>
-
-      {/* Name pill */}
-      <span className={cn(
-        "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-        agent.is_board_lead
-          ? "bg-indigo-600 text-white"
-          : "bg-[color:var(--surface-strong)] text-strong",
-      )}>
-        {agent.name}
-      </span>
-
-      {/* Status dot */}
-      <span className={cn("h-2 w-2 rounded-full", STATUS_DOT[activity])} />
-    </div>
-  );
-});
-
-// ---------------------------------------------------------------------------
-// Meeting Table (drop target)
-// ---------------------------------------------------------------------------
-
-function MeetingTable({
-  attendees,
+function OfficeFloor({
   agents,
-  onDrop,
-  onRemove,
+  boardMap,
+  tableAttendees,
   isMeeting,
-}: {
-  attendees: Set<string>;
-  agents: AgentRead[];
-  onDrop: (agentId: string) => void;
-  onRemove: (agentId: string) => void;
-  isMeeting: boolean;
-}) {
-  const [dragOver, setDragOver] = useState(false);
-  const tableAgents = agents.filter((a) => attendees.has(a.id));
-
-  return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragOver(false);
-        const agentId = e.dataTransfer.getData("text/plain");
-        if (agentId) onDrop(agentId);
-      }}
-      className={cn(
-        "flex flex-col items-center gap-3 rounded-xl border-2 border-dashed p-6 transition-all duration-300 min-h-[120px]",
-        dragOver
-          ? "border-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20 scale-[1.02]"
-          : "border-[color:var(--border)] bg-[color:var(--surface-muted)]",
-        isMeeting && "border-emerald-400 bg-emerald-50/30 dark:bg-emerald-900/10",
-      )}
-    >
-      <div className="flex items-center gap-2">
-        <span className="text-lg">{isMeeting ? "🗣️" : "📋"}</span>
-        <span className={cn(
-          "text-[10px] font-semibold uppercase tracking-widest",
-          isMeeting ? "text-emerald-600 dark:text-emerald-400" : "text-muted",
-        )}>
-          {isMeeting
-            ? `Meeting in progress (${tableAgents.length})`
-            : tableAgents.length > 0
-              ? `Meeting Table (${tableAgents.length})`
-              : "Drop agents here to start a meeting"
-          }
-        </span>
-      </div>
-
-      {/* Attendees around the table */}
-      {tableAgents.length > 0 && (
-        <div className="flex flex-wrap justify-center gap-3">
-          {tableAgents.map((agent, i) => (
-            <AgentDesk
-              key={agent.id}
-              agent={agent}
-              index={i}
-              atTable
-              onRemoveFromTable={() => onRemove(agent.id)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Meeting pulse */}
-      {isMeeting && tableAgents.length > 0 && (
-        <div className="flex items-center gap-2 text-[11px] text-emerald-600 dark:text-emerald-400">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-          </span>
-          Agents are collaborating...
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Activity Feed
-// ---------------------------------------------------------------------------
-
-const ActivityFeed = memo(function ActivityFeed({
-  events,
+  selectedAgent,
+  onSelectAgent,
   isLoading,
 }: {
-  events: Array<{ id: string; event_type: string; message: string; created_at: string }>;
+  agents: AgentRead[];
+  boardMap: Map<string, string>;
+  tableAttendees: Set<string>;
+  isMeeting: boolean;
+  selectedAgent: string | null;
+  onSelectAgent: (id: string | null) => void;
   isLoading: boolean;
 }) {
-  const dotColor = (type: string) => {
-    if (type.includes("comment")) return "bg-blue-500";
-    if (type.includes("done") || type.includes("complete")) return "bg-emerald-500";
-    if (type.includes("error")) return "bg-rose-500";
-    return "bg-gray-400";
-  };
+  const deskAgents = agents.filter((a) => !tableAttendees.has(a.id));
+  const tableAgents = agents.filter((a) => tableAttendees.has(a.id));
 
-  return (
-    <div className="flex h-full flex-col border-l border-[color:var(--border)] bg-[color:var(--surface)]">
-      <div className="border-b border-[color:var(--border)] px-4 py-3">
-        <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted">
-          <Activity className="h-3.5 w-3.5" />
-          Live Activity
-        </h3>
-      </div>
-      <div className="flex-1 overflow-y-auto" aria-live="polite">
-        {isLoading ? (
-          <div className="space-y-3 p-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-10 animate-pulse rounded bg-[color:var(--surface-strong)]" />
-            ))}
-          </div>
-        ) : events.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-muted">
-            <Activity className="h-8 w-8 opacity-30 mb-2" />
-            <p className="text-xs">No recent activity</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-[color:var(--border)]">
-            {events.slice(0, 20).map((event) => (
-              <div key={event.id} className="px-4 py-3">
-                <div className="flex items-start gap-2">
-                  <span className={cn("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", dotColor(event.event_type))} />
-                  <div className="min-w-0">
-                    <p className="text-xs text-strong line-clamp-2">{event.message}</p>
-                    <p className="mt-0.5 text-[10px] text-muted">{timeAgo(event.created_at)}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-});
-
-// ---------------------------------------------------------------------------
-// Chat Panel (slide-out)
-// ---------------------------------------------------------------------------
-
-function ChatPanel({
-  onClose,
-  agents,
-  boards,
-}: {
-  onClose: () => void;
-  agents: AgentRead[];
-  boards: BoardRead[];
-}) {
-  const [message, setMessage] = useState("");
-  const [chatMessages, setChatMessages] = useState<BoardGroupMemoryRead[]>([]);
-  const [isSending, setIsSending] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedBoardId, setSelectedBoardId] = useState<string>("");
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Default to first board
-  useEffect(() => {
-    if (!selectedBoardId && boards.length > 0) {
-      setSelectedBoardId(boards[0]!.id);
-    }
-  }, [boards, selectedBoardId]);
-
-  // Load chat messages — uses group memory for cross-board visibility
-  const loadMessages = useCallback(async () => {
-    if (!selectedBoardId) return;
-    // For "All Boards" mode, use first board as context — group memory is shared across all boards
-    const contextBoardId = selectedBoardId === "__all__" ? boards[0]?.id : selectedBoardId;
-    if (!contextBoardId) return;
-    try {
-      const res = await listBoardGroupMemoryForBoardApiV1BoardsBoardIdGroupMemoryGet(
-        contextBoardId,
-        { is_chat: true, limit: 100 },
-      );
-      
-      if (res.status === 200) {
-        const items = (res.data as { items?: BoardGroupMemoryRead[] })?.items ?? [];
-        // Sort by timestamp
-        const sorted = [...items].sort(
-          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-        );
-        setChatMessages(sorted);
-      }
-    } catch {
-      // silent
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedBoardId, boards]);
-
-  // Initial load + polling
-  useEffect(() => {
-    setIsLoading(true);
-    setChatMessages([]);
-    void loadMessages();
-    pollRef.current = setInterval(() => void loadMessages(), 5_000);
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [loadMessages]);
-
-  // Auto-scroll on new messages
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [chatMessages.length]);
-
-  const handleSend = useCallback(async () => {
-    if (!message.trim() || !selectedBoardId || isSending) return;
-    // For "All Boards" mode, post to first board — group memory is shared across all boards
-    const contextBoardId = selectedBoardId === "__all__" ? boards[0]?.id : selectedBoardId;
-    if (!contextBoardId) return;
-    setIsSending(true);
-    try {
-      // Use group memory so message is visible to all boards in the group
-      const res = await createBoardGroupMemoryForBoardApiV1BoardsBoardIdGroupMemoryPost(
-        contextBoardId,
-        { content: message.trim(), tags: ["chat", "office-meeting"], source: "Office Meeting" },
-      );
-      if (res.status === 200) {
-        setMessage("");
-        void loadMessages();
-      }
-    } catch {
-      // silent
-    } finally {
-      setIsSending(false);
-    }
-  }, [message, selectedBoardId, isSending, loadMessages, boards]);
-
-  // Build agent name map for display
-  const agentNameMap = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const a of agents) m.set(a.id, a.name);
+  // Group desk agents by board for zone labels
+  const zones = useMemo(() => {
+    const m = new Map<string, { label: string; agents: { agent: AgentRead; globalIdx: number }[] }>();
+    deskAgents.forEach((agent, i) => {
+      const bid = agent.board_id ?? "unassigned";
+      if (!m.has(bid)) m.set(bid, { label: boardMap.get(bid) ?? "Unassigned", agents: [] });
+      m.get(bid)!.agents.push({ agent, globalIdx: agents.indexOf(agent) });
+    });
     return m;
-  }, [agents]);
+  }, [deskAgents, agents, boardMap]);
+
+  // Build desk positions
+  const deskPositions = useMemo(() => {
+    const pos = new Map<string, { x: number; y: number }>();
+    let idx = 0;
+    for (const [, zone] of zones) {
+      for (const { agent } of zone.agents) {
+        pos.set(agent.id, agentDeskPosition(idx, deskAgents.length));
+        idx++;
+      }
+    }
+    return pos;
+  }, [zones, deskAgents.length]);
 
   return (
-    <div className="flex h-full flex-col border-l border-[color:var(--border)] bg-[color:var(--surface)]">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-[color:var(--border)] px-4 py-3">
-        <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted">
-          <MessageCircle className="h-3.5 w-3.5" />
-          Office Meeting Chat
-        </h3>
-        <button onClick={onClose} className="text-muted hover:text-strong transition">
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Chat target selector */}
-      {boards.length > 0 && (
-        <div className="border-b border-[color:var(--border)] px-4 py-2">
-          <label className="text-[10px] font-semibold text-muted mb-1 block">Chat in:</label>
-          <select
-            value={selectedBoardId}
-            onChange={(e) => setSelectedBoardId(e.target.value)}
-            className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2 py-1 text-[11px] text-strong"
-          >
-            {boards.length > 1 && (
-              <option value="__all__">✦ All Boards (Office Meeting)</option>
-            )}
-            {boards.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2">
-        {isLoading ? (
-          <div className="space-y-2 pt-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded-lg bg-[color:var(--surface-strong)]" />
-            ))}
-          </div>
-        ) : chatMessages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-muted">
-            <MessageCircle className="h-6 w-6 opacity-30 mb-2" />
-            <p className="text-[11px]">No messages yet</p>
-            <p className="text-[10px] mt-0.5">Board chat messages will appear here.</p>
-          </div>
-        ) : (
-          chatMessages.map((msg) => (
-            <div key={msg.id} className="rounded-lg bg-[color:var(--surface-muted)] px-3 py-2">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-strong">
-                  {msg.source ?? "Unknown"}
-                </span>
-                <span className="text-[9px] text-muted">
-                  {timeAgo(msg.created_at)}
-                </span>
-              </div>
-              <p className="text-xs text-strong mt-0.5 whitespace-pre-wrap break-words">
-                {msg.content}
-              </p>
+    <div className="relative flex-1 overflow-auto">
+      <div
+        className="relative mx-auto"
+        style={{
+          width: FLOOR_W,
+          minHeight: FLOOR_H,
+          backgroundImage: `
+            linear-gradient(45deg, var(--tile-a) 25%, transparent 25%),
+            linear-gradient(-45deg, var(--tile-a) 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, var(--tile-a) 75%),
+            linear-gradient(-45deg, transparent 75%, var(--tile-a) 75%)
+          `,
+          backgroundSize: "64px 64px",
+          backgroundPosition: "0 0, 0 32px, 32px -32px, -32px 0",
+          backgroundColor: "var(--tile-b)",
+        }}
+        onClick={() => onSelectAgent(null)}
+      >
+        {/* Loading skeleton */}
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-20 w-16 animate-pulse rounded-lg bg-[color:var(--surface-strong)] opacity-50" />
+              ))}
             </div>
-          ))
+          </div>
         )}
-      </div>
 
-      {/* Input */}
-      <div className="border-t border-[color:var(--border)] p-3">
-        <div className="flex gap-2">
-          <input
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void handleSend();
-              }
-            }}
-            placeholder="Type a message..."
-            disabled={isSending}
-            className="flex-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-1.5 text-xs text-strong placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:opacity-50"
-          />
-          <button
-            onClick={() => void handleSend()}
-            disabled={isSending || !message.trim()}
-            className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition disabled:opacity-50"
-          >
-            {isSending ? "..." : "Send"}
-          </button>
+        {/* Empty state */}
+        {!isLoading && agents.length === 0 && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-muted">
+            <Building2 className="h-12 w-12 opacity-30 mb-3" />
+            <p className="text-lg font-medium">Office is empty</p>
+            <p className="text-sm mt-1">Add agents to populate the workspace</p>
+          </div>
+        )}
+
+        {/* Plants */}
+        {PLANTS.map((p, i) => (
+          <span key={i} className="absolute text-2xl select-none pointer-events-none" style={{ left: p.x, top: p.y }}>
+            🪴
+          </span>
+        ))}
+
+        {/* Zone labels */}
+        {Array.from(zones.entries()).map(([bid, zone], zi) => {
+          const firstAgent = zone.agents[0];
+          if (!firstAgent) return null;
+          const pos = deskPositions.get(firstAgent.agent.id);
+          if (!pos) return null;
+          return (
+            <span
+              key={bid}
+              className="absolute text-[10px] font-bold uppercase tracking-widest text-muted/60 select-none pointer-events-none"
+              style={{ left: pos.x - 10, top: pos.y - 24 }}
+            >
+              {zone.label}
+            </span>
+          );
+        })}
+
+        {/* Desk furniture (behind agents) */}
+        {deskAgents.map((agent) => {
+          const pos = deskPositions.get(agent.id);
+          if (!pos) return null;
+          return (
+            <div
+              key={`desk-${agent.id}`}
+              className="absolute rounded border border-[color:var(--border)] bg-[color:var(--surface)]/60 pointer-events-none"
+              style={{ left: pos.x - 6, top: pos.y + 60, width: 76, height: 24 }}
+            >
+              <span className="absolute top-0.5 left-1/2 -translate-x-1/2 text-[10px] opacity-40">🖥️</span>
+            </div>
+          );
+        })}
+
+        {/* Agents at desks */}
+        {deskAgents.map((agent) => {
+          const pos = deskPositions.get(agent.id);
+          if (!pos) return null;
+          return (
+            <AgentSprite
+              key={agent.id}
+              agent={agent}
+              index={agents.indexOf(agent)}
+              selected={selectedAgent === agent.id}
+              onClick={() => { onSelectAgent(agent.id); }}
+              style={{ left: pos.x, top: pos.y, transition: "left 0.5s ease, top 0.5s ease" }}
+            />
+          );
+        })}
+
+        {/* Meeting table */}
+        <div
+          className={cn(
+            "absolute rounded-xl border-2 flex items-center justify-center pointer-events-none",
+            isMeeting
+              ? "border-emerald-400 bg-emerald-500/10"
+              : tableAgents.length > 0
+                ? "border-indigo-400/50 bg-indigo-500/5"
+                : "border-[color:var(--border)] bg-[color:var(--surface)]/40",
+          )}
+          style={{
+            left: TABLE_CX - TABLE_W / 2,
+            top: TABLE_CY - TABLE_H / 2,
+            width: TABLE_W,
+            height: TABLE_H,
+          }}
+        >
+          <span className="text-[11px] font-bold uppercase tracking-widest text-muted/50 select-none">
+            {isMeeting ? "🗣️ Meeting" : "📋 Table"}
+          </span>
+          {/* Meeting timer overlay */}
+          {isMeeting && (
+            <span className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[9px] font-bold text-white">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white" />
+              </span>
+              LIVE
+            </span>
+          )}
         </div>
+
+        {/* Agents gathered at meeting table */}
+        {tableAgents.map((agent, i) => {
+          const pos = gatherPosition(i, tableAgents.length, TABLE_CX, TABLE_CY);
+          return (
+            <AgentSprite
+              key={agent.id}
+              agent={agent}
+              index={agents.indexOf(agent)}
+              selected={selectedAgent === agent.id}
+              onClick={() => { onSelectAgent(agent.id); }}
+              style={{ left: pos.x, top: pos.y, transition: "left 0.5s ease, top 0.5s ease" }}
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -486,83 +246,53 @@ function ChatPanel({
 export default function OfficePage() {
   const { isSignedIn } = useAuth();
 
-  // ---------------------------------------------------------------------------
-  // Persist meeting state across page navigations via sessionStorage
-  // ---------------------------------------------------------------------------
-  const STORAGE_KEY = "office-meeting-state";
-
+  // Persisted state
   const loadPersistedState = useCallback(() => {
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY);
       if (!raw) return null;
-      const parsed = JSON.parse(raw) as {
-        attendees?: string[];
-        isMeeting?: boolean;
-        allWorking?: boolean;
-        chatOpen?: boolean;
-      };
-      return parsed;
-    } catch {
-      return null;
-    }
+      return JSON.parse(raw) as { attendees?: string[]; isMeeting?: boolean; allWorking?: boolean; chatOpen?: boolean };
+    } catch { return null; }
   }, []);
 
   const persistState = useCallback(
     (attendees: Set<string>, meeting: boolean, working: boolean, chat: boolean) => {
       try {
-        sessionStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({
-            attendees: [...attendees],
-            isMeeting: meeting,
-            allWorking: working,
-            chatOpen: chat,
-          }),
-        );
-      } catch {
-        // silent — sessionStorage may be unavailable
-      }
-    },
-    [],
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+          attendees: [...attendees], isMeeting: meeting, allWorking: working, chatOpen: chat,
+        }));
+      } catch { /* silent */ }
+    }, [],
   );
 
-  // Initialize from sessionStorage
   const [tableAttendees, setTableAttendees] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
-    const saved = loadPersistedState();
-    return saved?.attendees ? new Set(saved.attendees) : new Set();
+    const s = loadPersistedState(); return s?.attendees ? new Set(s.attendees) : new Set();
   });
   const [isMeeting, setIsMeeting] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return loadPersistedState()?.isMeeting ?? false;
+    if (typeof window === "undefined") return false; return loadPersistedState()?.isMeeting ?? false;
   });
   const [allWorking, setAllWorking] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return loadPersistedState()?.allWorking ?? false;
+    if (typeof window === "undefined") return false; return loadPersistedState()?.allWorking ?? false;
   });
   const [chatOpen, setChatOpen] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return loadPersistedState()?.chatOpen ?? false;
+    if (typeof window === "undefined") return false; return loadPersistedState()?.chatOpen ?? false;
   });
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [activityCollapsed, setActivityCollapsed] = useState(false);
 
-  // Persist whenever state changes
-  useEffect(() => {
-    persistState(tableAttendees, isMeeting, allWorking, chatOpen);
-  }, [tableAttendees, isMeeting, allWorking, chatOpen, persistState]);
+  useEffect(() => { persistState(tableAttendees, isMeeting, allWorking, chatOpen); },
+    [tableAttendees, isMeeting, allWorking, chatOpen, persistState]);
 
+  // Data hooks (PRESERVED)
   const agentsQuery = useListAgentsApiV1AgentsGet<listAgentsApiV1AgentsGetResponse>(
-    undefined,
-    { query: { enabled: Boolean(isSignedIn), refetchInterval: 15_000 } },
+    undefined, { query: { enabled: Boolean(isSignedIn), refetchInterval: 15_000 } },
   );
-
   const boardsQuery = useListBoardsApiV1BoardsGet<listBoardsApiV1BoardsGetResponse>(
-    undefined,
-    { query: { enabled: Boolean(isSignedIn) } },
+    undefined, { query: { enabled: Boolean(isSignedIn) } },
   );
-
   const activityQuery = useListActivityApiV1ActivityGet<listActivityApiV1ActivityGetResponse>(
-    { limit: 20 },
-    { query: { enabled: Boolean(isSignedIn), refetchInterval: 15_000 } },
+    { limit: 20 }, { query: { enabled: Boolean(isSignedIn), refetchInterval: 15_000 } },
   );
 
   const agents: AgentRead[] = useMemo(() => {
@@ -588,74 +318,52 @@ export default function OfficePage() {
   const activityEvents = useMemo(() => {
     const data = activityQuery.data?.data;
     if (Array.isArray(data)) return data;
-    if (data && typeof data === "object" && "items" in data) return (data as { items: Array<{ id: string; event_type: string; message: string; created_at: string }> }).items;
+    if (data && typeof data === "object" && "items" in data)
+      return (data as { items: Array<{ id: string; event_type: string; message: string; created_at: string }> }).items;
     return [];
   }, [activityQuery.data]);
 
-  // Group agents by board — only show those NOT at the table
-  const agentsByBoard = useMemo(() => {
-    const groups = new Map<string, AgentRead[]>();
-    for (const agent of agents) {
-      if (tableAttendees.has(agent.id)) continue; // at meeting table
-      const key = agent.board_id ?? "unassigned";
-      const list = groups.get(key) ?? [];
-      list.push(agent);
-      groups.set(key, list);
-    }
-    return groups;
-  }, [agents, tableAttendees]);
-
-  // --- Button handlers ---
-
-  const handleDropOnTable = useCallback((agentId: string) => {
-    setTableAttendees((prev) => new Set(prev).add(agentId));
-    setAllWorking(false);
-  }, []);
-
-  const handleRemoveFromTable = useCallback((agentId: string) => {
-    setTableAttendees((prev) => {
-      const next = new Set(prev);
-      next.delete(agentId);
-      if (next.size === 0) setIsMeeting(false);
-      return next;
-    });
+  // Handlers
+  const handleAllWorking = useCallback(() => {
+    setTableAttendees(new Set()); setIsMeeting(false); setAllWorking(true);
   }, []);
 
   const handleGather = useCallback(() => {
-    // Gather ALL agents to the meeting table
-    setTableAttendees(new Set(agents.map((a) => a.id)));
-    setAllWorking(false);
+    setTableAttendees(new Set(agents.map((a) => a.id))); setAllWorking(false);
   }, [agents]);
 
-  const handleAllWorking = useCallback(() => {
-    // Send everyone back to their desks
-    setTableAttendees(new Set());
-    setIsMeeting(false);
-    setAllWorking(true);
-  }, []);
-
   const handleRunMeeting = useCallback(() => {
-    if (tableAttendees.size === 0) {
-      // If no one at table, gather everyone first
-      setTableAttendees(new Set(agents.map((a) => a.id)));
-    }
-    setIsMeeting(true);
-    setAllWorking(false);
+    if (tableAttendees.size === 0) setTableAttendees(new Set(agents.map((a) => a.id)));
+    setIsMeeting(true); setAllWorking(false);
   }, [agents, tableAttendees.size]);
 
-  const handleEndMeeting = useCallback(() => {
-    setIsMeeting(false);
+  const handleEndMeeting = useCallback(() => { setIsMeeting(false); }, []);
+
+  const handleAgentTabClick = useCallback((id: string) => {
+    setTableAttendees((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); if (next.size === 0) setIsMeeting(false); }
+      else next.add(id);
+      return next;
+    });
+    setSelectedAgent(id);
   }, []);
 
   const activeCount = agents.filter((a) => agentActivity(a) === "active").length;
   const idleCount = agents.filter((a) => agentActivity(a) === "idle").length;
 
+  // Responsive: detect width
+  const [winWidth, setWinWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1400);
+  useEffect(() => {
+    const h = () => setWinWidth(window.innerWidth);
+    window.addEventListener("resize", h); return () => window.removeEventListener("resize", h);
+  }, []);
+  const isMobile = winWidth < 768;
+  const isTablet = winWidth >= 768 && winWidth < 1200;
+
   return (
     <DashboardPageLayout
-      signedOut={{
-        message: "Sign in to view the virtual office.",
-        forceRedirectUrl: "/office",
-      }}
+      signedOut={{ message: "Sign in to view the virtual office.", forceRedirectUrl: "/office" }}
       title={
         <span className="flex items-center gap-3">
           <Building2 className="h-6 w-6" />
@@ -664,190 +372,171 @@ export default function OfficePage() {
       }
       description={`${agents.length} agents · ${activeCount} active · ${idleCount} idle`}
     >
-      <div className="flex h-[calc(100vh-4rem)] flex-col">
-        {/* Main area */}
-        <div className="flex flex-1 min-h-0">
-          {/* Office floor */}
-          <div className="flex-1 overflow-auto p-6">
-            {/* Checkered floor */}
-            <div
-              className="relative min-h-[500px] rounded-xl border border-[color:var(--border)] p-8"
-              style={{
-                backgroundImage:
-                  "linear-gradient(45deg, var(--surface-muted) 25%, transparent 25%), linear-gradient(-45deg, var(--surface-muted) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--surface-muted) 75%), linear-gradient(-45deg, transparent 75%, var(--surface-muted) 75%)",
-                backgroundSize: "40px 40px",
-                backgroundPosition: "0 0, 0 20px, 20px -20px, -20px 0px",
-              }}
-            >
-              {/* Board zones (agents at their desks) */}
-              {Array.from(agentsByBoard.entries()).map(([boardId, boardAgents], groupIdx) => (
-                <div key={boardId} className="mb-8">
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className="rounded bg-[color:var(--surface)] px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-muted border border-[color:var(--border)]">
-                      {boardMap.get(boardId) ?? "Unassigned"}
-                    </span>
-                    <span className="text-[10px] text-muted">
-                      {boardAgents.length} agent{boardAgents.length !== 1 ? "s" : ""}
-                    </span>
-                  </div>
+      {/* CSS custom properties for tile colors */}
+      <style>{`
+        :root { --tile-a: #e5e5e5; --tile-b: #f5f5f5; }
+        .dark { --tile-a: #262626; --tile-b: #1a1a1a; }
+      `}</style>
 
-                  <div className={cn(
-                    "flex flex-wrap gap-4 transition-all duration-500",
-                    allWorking && "gap-3",
-                  )}>
-                    {boardAgents.map((agent, i) => (
-                      <AgentDesk
-                        key={agent.id}
-                        agent={agent}
-                        index={groupIdx * 10 + i}
-                      />
+      <div className="flex h-[calc(100vh-4rem)] flex-col">
+        {/* Main area: floor + right panel */}
+        <div className="flex flex-1 min-h-0">
+          {/* Office floor + demo controls */}
+          <div className="flex flex-1 flex-col min-w-0">
+            {/* Mobile: simplified list view */}
+            {isMobile ? (
+              <div className="flex-1 overflow-auto p-4 space-y-2">
+                {agentsQuery.isLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-14 animate-pulse rounded-lg bg-[color:var(--surface-strong)]" />
                     ))}
                   </div>
-                </div>
-              ))}
+                ) : agents.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-muted">
+                    <Building2 className="h-10 w-10 opacity-30 mb-2" />
+                    <p className="font-medium">Office is empty</p>
+                  </div>
+                ) : (
+                  agents.map((agent, i) => {
+                    const act = agentActivity(agent);
+                    return (
+                      <div key={agent.id} className="flex items-center gap-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] p-3">
+                        <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", STATUS_DOT[act])} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-strong truncate">{agent.name}</p>
+                          <p className="text-[11px] text-muted">{boardMap.get(agent.board_id ?? "") ?? "Unassigned"} · {act}</p>
+                        </div>
+                        {tableAttendees.has(agent.id) && <span className="text-xs">📋</span>}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            ) : (
+              /* Desktop/tablet: 2D office floor */
+              <OfficeFloor
+                agents={agents}
+                boardMap={boardMap}
+                tableAttendees={tableAttendees}
+                isMeeting={isMeeting}
+                selectedAgent={selectedAgent}
+                onSelectAgent={setSelectedAgent}
+                isLoading={agentsQuery.isLoading}
+              />
+            )}
 
-              {/* Meeting table (drop target) */}
-              {agents.length > 0 && (
-                <div className="flex justify-center py-4">
-                  <MeetingTable
-                    attendees={tableAttendees}
-                    agents={agents}
-                    onDrop={handleDropOnTable}
-                    onRemove={handleRemoveFromTable}
-                    isMeeting={isMeeting}
-                  />
-                </div>
-              )}
-
-              {/* Empty state */}
-              {agents.length === 0 && !agentsQuery.isLoading && (
-                <div className="flex flex-col items-center justify-center py-20 text-muted">
-                  <Building2 className="h-12 w-12 opacity-30 mb-3" />
-                  <p className="text-lg font-medium">Office is empty</p>
-                  <p className="text-sm">Add agents to populate the virtual workspace.</p>
-                </div>
-              )}
-
-              {/* Loading */}
-              {agentsQuery.isLoading && (
-                <div className="flex flex-wrap justify-center gap-4 py-12">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="h-24 w-20 animate-pulse rounded-lg bg-[color:var(--surface-strong)]" />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Controls */}
-            <div className="mt-4 flex items-center gap-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-2.5">
+            {/* Demo Controls Bar */}
+            <div className="shrink-0 flex items-center gap-2 border-t border-[color:var(--border)] bg-[color:var(--card,var(--surface))] px-4 h-12">
               <button
                 onClick={handleAllWorking}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition",
+                  "flex items-center gap-2 rounded-md h-8 px-4 text-xs font-medium transition",
                   allWorking && tableAttendees.size === 0
                     ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                     : "bg-[color:var(--surface-muted)] text-strong hover:bg-[color:var(--surface-strong)]",
                 )}
-                title="Send all agents back to their desks"
               >
-                <Briefcase className="h-3.5 w-3.5" />
-                All Working
+                💼 All Working
               </button>
               <button
                 onClick={handleGather}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition",
+                  "flex items-center gap-2 rounded-md h-8 px-4 text-xs font-medium transition",
                   tableAttendees.size === agents.length && agents.length > 0
                     ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                     : "bg-[color:var(--surface-muted)] text-strong hover:bg-[color:var(--surface-strong)]",
                 )}
-                title="Gather all agents to the meeting table"
               >
-                <Users className="h-3.5 w-3.5" />
-                Gather
+                🤝 Gather
               </button>
               {isMeeting ? (
-                <button
-                  onClick={handleEndMeeting}
-                  className="flex items-center gap-2 rounded-md bg-rose-100 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:hover:bg-rose-900/50"
-                  title="End the meeting"
-                >
-                  <Pause className="h-3.5 w-3.5" />
-                  End Meeting
+                <button onClick={handleEndMeeting} className="flex items-center gap-2 rounded-md h-8 px-4 text-xs font-medium bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 hover:bg-rose-200 transition">
+                  📋 End Meeting
                 </button>
               ) : (
-                <button
-                  onClick={handleRunMeeting}
-                  className="flex items-center gap-2 rounded-md bg-[color:var(--surface-muted)] px-3 py-1.5 text-xs font-medium text-strong transition hover:bg-[color:var(--surface-strong)]"
-                  title={tableAttendees.size > 0 ? "Start meeting with agents at the table" : "Gather all agents and start meeting"}
-                >
-                  <Play className="h-3.5 w-3.5" />
-                  Run Meeting
+                <button onClick={handleRunMeeting} className="flex items-center gap-2 rounded-md h-8 px-4 text-xs font-medium bg-[color:var(--surface-muted)] text-strong hover:bg-[color:var(--surface-strong)] transition">
+                  📋 Run Meeting
                 </button>
               )}
               <button
                 onClick={() => setChatOpen(!chatOpen)}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition",
+                  "flex items-center gap-2 rounded-md h-8 px-4 text-xs font-medium transition",
                   chatOpen
                     ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
                     : "bg-indigo-600 text-white hover:bg-indigo-700",
                 )}
-                title="Toggle office chat panel"
               >
-                <MessageCircle className="h-3.5 w-3.5" />
-                {chatOpen ? "Close Chat" : "Start Chat"}
+                💬 {chatOpen ? "Close Chat" : "+ Start Chat"}
               </button>
-
-              {/* Status info */}
               {tableAttendees.size > 0 && (
                 <span className="ml-auto text-[11px] text-muted">
                   {tableAttendees.size} at table · {agents.length - tableAttendees.size} at desks
                 </span>
               )}
+              {/* Tablet: activity toggle */}
+              {isTablet && (
+                <button
+                  onClick={() => setActivityCollapsed(!activityCollapsed)}
+                  className="ml-auto flex items-center gap-1 rounded-md h-8 px-3 text-xs font-medium bg-[color:var(--surface-muted)] text-strong hover:bg-[color:var(--surface-strong)] transition"
+                >
+                  📊 Activity
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Right panel: Chat or Activity */}
-          <div className="hidden w-72 shrink-0 lg:block">
-            {chatOpen ? (
-              <ChatPanel onClose={() => setChatOpen(false)} agents={agents} boards={boards} />
+          {/* Right panel: Activity or Chat */}
+          {!isMobile && (
+            chatOpen ? (
+              <div className="w-[280px] shrink-0">
+                <ChatPanel onClose={() => setChatOpen(false)} agents={agents} boards={boards} />
+              </div>
+            ) : isTablet ? (
+              <ActivityPanel
+                events={activityEvents}
+                isLoading={activityQuery.isLoading}
+                collapsed={activityCollapsed}
+                onToggle={() => setActivityCollapsed(!activityCollapsed)}
+              />
             ) : (
-              <ActivityFeed events={activityEvents} isLoading={activityQuery.isLoading} />
-            )}
-          </div>
+              <ActivityPanel events={activityEvents} isLoading={activityQuery.isLoading} />
+            )
+          )}
         </div>
 
-        {/* Agent status bar */}
-        <div className="shrink-0 border-t border-[color:var(--border)] bg-[color:var(--surface)]">
-          <div className="flex items-center gap-1 overflow-x-auto px-4 py-2">
+        {/* Agent Status Bar (bottom, 48px) */}
+        <div className="shrink-0 h-12 border-t border-[color:var(--border)] bg-[color:var(--surface)]">
+          <div className="flex items-center h-full gap-1 overflow-x-auto px-4">
             {agents.map((agent) => {
-              const activity = agentActivity(agent);
+              const act = agentActivity(agent);
               const atTable = tableAttendees.has(agent.id);
+              const isSelected = selectedAgent === agent.id;
               return (
                 <button
                   key={agent.id}
-                  onClick={() => {
-                    if (atTable) {
-                      handleRemoveFromTable(agent.id);
-                    } else {
-                      handleDropOnTable(agent.id);
-                    }
-                  }}
+                  onClick={() => handleAgentTabClick(agent.id)}
                   className={cn(
-                    "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition",
-                    atTable
-                      ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
-                      : "text-strong hover:bg-[color:var(--surface-muted)]",
+                    "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 h-8 text-xs transition border-b-2",
+                    isSelected
+                      ? "border-indigo-500 font-bold text-strong"
+                      : atTable
+                        ? "border-transparent bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400 font-medium"
+                        : "border-transparent text-strong hover:bg-[color:var(--surface-muted)] font-medium",
                   )}
-                  title={atTable ? `${agent.name} is at the table (click to send back)` : `${agent.name} is at desk (click to bring to table)`}
+                  title={`${agent.name} — ${act}${atTable ? " (at table)" : ""}`}
                 >
-                  <span className={cn("h-2 w-2 rounded-full", STATUS_DOT[activity])} />
+                  <span className={cn("h-2 w-2 rounded-full", STATUS_DOT[act])} />
                   {agent.name}
                   {atTable && <span className="text-[9px]">📋</span>}
                 </button>
               );
             })}
+            {/* Add button */}
+            <button className="flex shrink-0 items-center justify-center h-8 w-8 rounded-md text-muted hover:bg-[color:var(--surface-muted)] hover:text-strong transition text-sm" title="Add agent">
+              +
+            </button>
           </div>
         </div>
       </div>
