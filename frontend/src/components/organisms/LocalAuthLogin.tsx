@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, Loader2, Lock } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Loader2, Shield } from "lucide-react";
 
 import { setLocalAuthToken } from "@/auth/localAuth";
 import { Button } from "@/components/ui/button";
@@ -54,7 +54,6 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
 
   const handleTokenChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setToken(event.target.value);
-    // Clear error as soon as the user edits the field
     if (error) setError(null);
   };
 
@@ -62,7 +61,7 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
     event.preventDefault();
     const cleaned = token.trim();
     if (!cleaned) {
-      setError("Access token is required.");
+      setError("Enter your Gateway Token above. Find it in your openclaw config or run `openclaw config get gateway.token`");
       return;
     }
     if (cleaned.length < LOCAL_AUTH_TOKEN_MIN_LENGTH) {
@@ -87,70 +86,56 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
 
   const tokenReady = token.trim().length >= LOCAL_AUTH_TOKEN_MIN_LENGTH;
 
-  const counterClass =
-    token.length >= LOCAL_AUTH_TOKEN_MIN_LENGTH
-      ? "text-[color:var(--success)]"
-      : error
-        ? "text-[color:var(--danger)]"
-        : "text-muted";
-
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-app px-4 py-10">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-app px-4 py-10"
+         style={{ background: "linear-gradient(135deg, var(--bg-app) 0%, var(--surface-muted, var(--bg-app)) 100%)" }}>
+      {/* Decorative background */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-28 -left-24 h-72 w-72 rounded-full bg-[color:var(--accent-soft)] blur-3xl" />
-        <div className="absolute -right-28 -bottom-24 h-80 w-80 rounded-full bg-[rgba(14,165,233,0.12)] blur-3xl" />
+        <div className="absolute -top-28 -left-24 h-72 w-72 rounded-full bg-[color:var(--accent-soft)] blur-3xl opacity-60" />
+        <div className="absolute -right-28 -bottom-24 h-80 w-80 rounded-full bg-[rgba(14,165,233,0.12)] blur-3xl opacity-60" />
       </div>
 
-      <Card className="relative w-full max-w-lg animate-fade-in-up">
-        <CardHeader className="space-y-5 border-b border-[color:var(--border)] pb-5">
-          <div className="flex items-center justify-between">
-            <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
-              Self-host mode
-            </span>
-            <div
-              className="rounded-xl bg-[color:var(--accent-soft)] p-2 text-[color:var(--accent)]"
-              title="Self-hosted secure mode"
-              aria-label="Self-hosted secure mode"
-            >
-              <Lock className="h-5 w-5" aria-hidden />
-            </div>
-          </div>
-          <div className="space-y-1">
-            {/* Branding wordmark */}
-            <div className="mb-1 flex items-center gap-2">
-              <span className="text-base font-bold tracking-tight text-strong">OpenClaw</span>
-              <span className="text-sm text-muted">Mission Control</span>
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-strong">
-              Local Authentication
-            </h1>
-            <p className="text-sm text-muted">
-              Enter your access token to unlock Mission Control.
-            </p>
-          </div>
+      {/* Logo & Branding */}
+      <div className="relative mb-8 text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--accent-soft)] text-[color:var(--accent)]">
+          <Shield className="h-7 w-7" aria-hidden />
+        </div>
+        <h1 className="text-[28px] font-semibold tracking-tight text-strong">
+          Mission Control
+        </h1>
+        <p className="mt-1 text-sm text-muted">
+          Connect to your OpenClaw Gateway
+        </p>
+      </div>
+
+      <Card className="relative w-full max-w-[440px] animate-fade-in-up shadow-[0_4px_24px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
+            style={{ borderRadius: "16px" }}>
+        <CardHeader className="sr-only">
+          <h2>Gateway Authentication</h2>
         </CardHeader>
-        <CardContent className="pt-5">
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <CardContent className="p-8">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Gateway Token */}
             <div className="space-y-2">
               <label
                 htmlFor="local-auth-token"
-                className="text-xs font-semibold uppercase tracking-[0.08em] text-muted"
+                className="text-sm font-medium text-strong"
               >
-                Access token
+                Gateway Token
               </label>
-              {/* Show/hide toggle wrapper */}
               <div className="relative">
                 <Input
                   id="local-auth-token"
                   type={showToken ? "text" : "password"}
                   value={token}
                   onChange={handleTokenChange}
-                  placeholder="Paste your access token"
+                  placeholder="Paste your gateway token"
                   autoFocus
                   disabled={isValidating}
-                  className="pr-10 font-mono"
+                  className="h-11 pr-10 font-mono"
                   hasError={!!error}
                   aria-describedby={error ? "local-auth-error" : "local-auth-hint"}
+                  style={{ borderRadius: "8px" }}
                 />
                 <button
                   type="button"
@@ -164,56 +149,45 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
                     : <Eye className="h-4 w-4" aria-hidden />}
                 </button>
               </div>
-              {/* Character counter */}
-              <div className="flex justify-end">
-                <span className={`text-xs tabular-nums ${counterClass}`}>
-                  {token.length}/{LOCAL_AUTH_TOKEN_MIN_LENGTH} characters
-                </span>
-              </div>
+              <p id="local-auth-hint" className="text-xs text-muted">
+                Find this in your openclaw config or run{" "}
+                <code className="rounded bg-[color:var(--surface-strong)] px-1 py-0.5 font-mono text-xs">openclaw dashboard</code>
+              </p>
             </div>
 
-            {error ? (
+            {/* Error state — between input and button per spec */}
+            {error && (
               <div
                 id="local-auth-error"
                 role="alert"
-                className="rounded-lg border-l-4 border-[color:var(--danger)] bg-[rgba(239,68,68,0.08)] px-4 py-3 text-sm text-[color:var(--text)] dark:bg-[rgba(239,68,68,0.12)]"
+                className="rounded-lg border-l-4 border-[color:var(--danger)] bg-[rgba(239,68,68,0.1)] px-4 py-3 text-sm text-strong dark:bg-[rgba(239,68,68,0.15)]"
               >
-                {error.split(/`([^`]+)`/).map((part, i) =>
-                  i % 2 === 1 ? (
-                    <code key={i} className="rounded bg-[color:var(--surface-strong)] px-1.5 py-0.5 font-mono text-xs">
-                      {part}
-                    </code>
-                  ) : (
-                    <span key={i}>{part}</span>
-                  )
-                )}
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 text-[color:var(--danger)]">⚠</span>
+                  <span>
+                    {error.split(/`([^`]+)`/).map((part, i) =>
+                      i % 2 === 1 ? (
+                        <code key={i} className="rounded bg-[color:var(--surface-strong)] px-1.5 py-0.5 font-mono text-xs">
+                          {part}
+                        </code>
+                      ) : (
+                        <span key={i}>{part}</span>
+                      )
+                    )}
+                  </span>
+                </div>
               </div>
-            ) : (
-              <p id="local-auth-hint" className="text-xs text-muted">
-                Access token must be at least {LOCAL_AUTH_TOKEN_MIN_LENGTH} characters.
-              </p>
             )}
 
-            {/* Help link */}
-            <p className="text-xs text-muted">
-              Need help?{" "}
-              <a
-                href="https://docs.openclaw.ai/self-hosting/auth-token"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline-offset-2 hover:text-strong hover:underline"
-              >
-                How do I find my access token?
-              </a>
-            </p>
-
+            {/* Submit button */}
             <Button
               type="submit"
-              className={`w-full transition-opacity ${
+              className={`group w-full transition-all ${
                 !tokenReady && !isValidating ? "opacity-50" : "opacity-100"
               }`}
               size="lg"
               disabled={isValidating}
+              style={{ height: "48px" }}
             >
               {isValidating ? (
                 <>
@@ -221,15 +195,34 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
                   Connecting…
                 </>
               ) : (
-                "Connect to Gateway"
+                <>
+                  Connect to Gateway
+                  <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                </>
               )}
             </Button>
+
+            {/* Divider */}
+            <div className="border-t border-[color:var(--border)]" />
+
+            {/* Help link */}
+            <p className="text-center text-sm text-muted">
+              Need help?{" "}
+              <a
+                href="https://docs.openclaw.ai"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[color:var(--accent)] underline-offset-2 hover:underline"
+              >
+                Read the docs →
+              </a>
+            </p>
           </form>
         </CardContent>
       </Card>
 
       {/* Footer */}
-      <p className="relative mt-6 text-center text-xs text-[color:var(--text-quiet)]">
+      <p className="relative mt-8 text-center text-xs text-muted">
         Powered by OpenClaw
       </p>
     </div>
