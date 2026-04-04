@@ -10,6 +10,7 @@ import {
   Trash2,
   ImageIcon,
   Download,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/atoms/Markdown";
@@ -388,7 +389,7 @@ export function TaskDetailPanel({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/quicktime,video/webm"
+                accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/quicktime,video/webm,application/pdf,text/markdown,text/plain,.pdf,.md,.markdown,.txt"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
@@ -405,6 +406,7 @@ export function TaskDetailPanel({
                 {attachments.map((att) => {
                   const isImage = att.mimetype.startsWith("image/");
                   const isVideo = att.mimetype.startsWith("video/");
+                  const isDocument = att.mimetype === "application/pdf" || att.mimetype.startsWith("text/");
                   const blobUrl = attachmentBlobUrls[att.id];
                   const sizeLabel =
                     att.file_size >= 1024 * 1024
@@ -436,11 +438,18 @@ export function TaskDetailPanel({
                         <div className="mb-2 flex h-24 items-center justify-center rounded-md bg-muted/30">
                           <span className="text-xs text-muted">Loading preview…</span>
                         </div>
+                      ) : isDocument ? (
+                        <div className="mb-2 flex h-16 items-center justify-center gap-2 rounded-md bg-muted/20">
+                          <FileText className="h-6 w-6 text-muted" />
+                          <span className="text-xs text-muted">{att.mimetype === "application/pdf" ? "PDF Document" : "Text Document"}</span>
+                        </div>
                       ) : null}
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
                           {isImage ? (
                             <ImageIcon className="h-3.5 w-3.5 shrink-0 text-muted" />
+                          ) : isDocument ? (
+                            <FileText className="h-3.5 w-3.5 shrink-0 text-muted" />
                           ) : (
                             <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted" />
                           )}

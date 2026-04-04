@@ -349,6 +349,9 @@ ALLOWED_MIMETYPES = {
     "video/mp4",
     "video/quicktime",
     "video/webm",
+    "application/pdf",
+    "text/markdown",
+    "text/plain",
 }
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB per file
 MAX_TASK_ATTACHMENTS_SIZE = 10 * 1024 * 1024  # 10 MB per task
@@ -362,7 +365,12 @@ _MAGIC_SIGNATURES: list[tuple[str, bytes, int]] = [
     ("video/mp4", b"ftyp", 4),
     ("video/quicktime", b"ftyp", 4),
     ("video/webm", b"\x1a\x45\xdf\xa3", 0),
+    ("application/pdf", b"%PDF", 0),
 ]
+
+# Text-based formats (markdown, plain text) have no reliable magic bytes.
+# They are validated by content-type header + filename extension only.
+_TEXT_MIMETYPES = {"text/markdown", "text/plain"}
 
 
 def _detect_mime_from_magic(content: bytes) -> str | None:
@@ -414,20 +422,32 @@ async def upload_task_attachment(
     content = await file.read()
     file_size = len(content)
 
-    detected_mime = _detect_mime_from_magic(content)
-    if detected_mime is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File content does not match any allowed type. "
-            f"Allowed: {', '.join(sorted(ALLOWED_MIMETYPES))}",
-        )
-    if detected_mime not in ALLOWED_MIMETYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Detected file type '{detected_mime}' not allowed. "
-            f"Allowed: {', '.join(sorted(ALLOWED_MIMETYPES))}",
-        )
-    content_type = detected_mime
+    # Text-based files (markdown, plain text) have no magic bytes —
+    # trust Content-Type + filename extension for these.
+    if content_type in _TEXT_MIMETYPES:
+        # Validate extension matches declared type
+        ext = (file.filename or "").rsplit(".", 1)[-1].lower() if file.filename else ""
+        valid_exts = {"text/markdown": {"md", "markdown"}, "text/plain": {"txt", "text", "md", "markdown"}}
+        if ext not in valid_exts.get(content_type, set()):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File extension '.{ext}' does not match declared type '{content_type}'.",
+            )
+    else:
+        detected_mime = _detect_mime_from_magic(content)
+        if detected_mime is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File content does not match any allowed type. "
+                f"Allowed: {', '.join(sorted(ALLOWED_MIMETYPES))}",
+            )
+        if detected_mime not in ALLOWED_MIMETYPES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Detected file type '{detected_mime}' not allowed. "
+                f"Allowed: {', '.join(sorted(ALLOWED_MIMETYPES))}",
+            )
+        content_type = detected_mime
 
     if file_size > MAX_FILE_SIZE:
         raise HTTPException(
