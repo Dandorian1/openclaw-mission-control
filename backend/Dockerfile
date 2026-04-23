@@ -32,7 +32,8 @@ FROM base AS runtime
 # Create non-root user before COPY so --chown can reference it.
 # Using COPY --chown avoids a slow recursive chown on overlay2 (docker/for-linux#388).
 RUN groupadd --system appgroup && useradd --system --gid appgroup --create-home appuser \
-  && chown appuser:appgroup /app
+  && chown appuser:appgroup /app \
+  && install -d -o appuser -g appgroup /persist/device-identity
 
 # Copy virtual environment from deps stage
 COPY --from=deps --chown=appuser:appgroup /app/.venv /app/.venv

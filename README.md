@@ -94,6 +94,7 @@ Before startup:
 - Ensure `BASE_URL` matches the public backend origin if you are not using `http://localhost:8000`.
 - `NEXT_PUBLIC_API_URL=auto` (default) resolves to `http(s)://<current-host>:8000`.
   - Set an explicit URL when your API is behind a reverse proxy or non-default port.
+- Docker deployments persist the gateway device identity in the `gateway_device_identity` volume so approved device-pairing state survives backend and worker recreates.
 
 ### 2. Start Mission Control
 
@@ -129,6 +130,13 @@ For a fully clean rebuild (no cached build layers):
 ```bash
 docker compose -f compose.yml --env-file .env build --no-cache --pull
 docker compose -f compose.yml --env-file .env up -d --force-recreate
+```
+
+If you intentionally want to force a brand-new gateway device identity and re-pair Mission Control, remove the persisted volume first:
+
+```bash
+docker compose -f compose.yml --env-file .env down
+docker volume rm openclaw-mission-control_gateway_device_identity
 ```
 
 ### 3. Open the application
