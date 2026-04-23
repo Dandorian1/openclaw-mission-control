@@ -16,7 +16,7 @@ from app.core.time import utcnow
 from app.models.agents import Agent
 from app.models.boards import Board
 from app.models.gateways import Gateway
-from app.services.openclaw.constants import CHECKIN_DEADLINE_AFTER_WAKE
+from app.services.openclaw.constants import checkin_deadline_after_wake
 from app.services.openclaw.db_agent_state import (
     mark_provision_complete,
     mark_provision_requested,
@@ -70,6 +70,8 @@ class AgentLifecycleOrchestrator(OpenClawDBService):
         """Provision or update any agent under a per-agent lock."""
 
         locked = await self._lock_agent(agent_id=agent_id)
+        is_main_agent = locked.board_id is None
+        checkin_timeout = checkin_deadline_after_wake(is_main_agent=is_main_agent)
         template_user = user
         if board is None and template_user is None:
             template_user = await get_org_owner_user(
@@ -93,7 +95,7 @@ class AgentLifecycleOrchestrator(OpenClawDBService):
         )
         locked.lifecycle_generation += 1
         locked.last_provision_error = None
-        locked.checkin_deadline_at = utcnow() + CHECKIN_DEADLINE_AFTER_WAKE if wake else None
+        locked.checkin_deadline_at = utcnow() + checkin_timeout if wake else None
         if wake:
             locked.wake_attempts += 1
             locked.last_wake_sent_at = utcnow()
@@ -150,11 +152,22 @@ class AgentLifecycleOrchestrator(OpenClawDBService):
             clear_confirm_token=clear_confirm_token,
         )
         locked.last_provision_error = None
-        locked.checkin_deadline_at = utcnow() + CHECKIN_DEADLINE_AFTER_WAKE if wake else None
+        locked.checkin_deadline_at = utcnow() + checkin_timeout if wake else None
         self.session.add(locked)
         await self.session.commit()
         await self.session.refresh(locked)
         if wake and locked.checkin_deadline_at is not None:
+            self.logger.info(
+                "lifecycle.checkin_deadline.assigned",
+                extra={
+                    "agent_id": str(locked.id),
+                    "gateway_id": str(locked.gateway_id),
+                    "board_id": str(locked.board_id) if locked.board_id is not None else None,
+                    "agent_role": "main" if is_main_agent else "board",
+                    "deadline_seconds": int(checkin_timeout.total_seconds()),
+                    "action": action,
+                },
+            )
             enqueue_lifecycle_reconcile(
                 QueuedAgentLifecycleReconcile(
                     agent_id=locked.id,

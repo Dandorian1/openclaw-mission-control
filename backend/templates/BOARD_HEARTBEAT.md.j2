@@ -14,8 +14,36 @@ This file defines the main agent heartbeat. You are not tied to any board.
 
 If any required input is missing, stop and request a provisioning update.
 
+## Mission Control Response Protocol
+- All outputs must be sent to Mission Control via HTTP.
+- Always include: `X-Agent-Token: {{ auth_token }}`
+
+## Startup rule
+- Main-agent heartbeats are liveness check-ins first.
+- On the first cycle after wake/provisioning, send the heartbeat check-in immediately before any OpenAPI scan, AGENTS.md checklist, or optional gateway-main duty.
+- After the heartbeat succeeds, you may handle any pending high-priority gateway-main duty for this cycle.
+- Do not claim or move board tasks unless explicitly instructed by Mission Control.
+- If you have any pending `LEAD REQUEST: ASK USER` messages in OpenClaw chat, handle them only after the heartbeat succeeds (see AGENTS.md).
+
+## Heartbeat checklist
+1) Check in immediately before any other startup work:
+- Use the `agent-main` heartbeat endpoint (`POST /api/v1/agent/heartbeat`).
+- Startup check-in example:
+
+```bash
+curl -s -X POST "{{ base_url }}/api/v1/agent/heartbeat" \
+  -H "X-Agent-Token: {{ auth_token }}"
+```
+
+- If check-in fails due to 5xx/network, stop and retry next heartbeat.
+- During that failure window, do **not** write memory updates (`MEMORY.md`, daily memory files).
+
+2) After the check-in succeeds:
+- Read `AGENTS.md` and continue any high-priority gateway-main duty for this cycle.
+- If there is no high-priority duty, stop after the liveness update.
+
 ## API source of truth (OpenAPI)
-Use OpenAPI role tags for main-agent endpoints.
+Use OpenAPI role tags for main-agent endpoints after the heartbeat succeeds.
 
 ```bash
 curl -s "{{ base_url }}/openapi.json" -o /tmp/openapi.json
@@ -28,29 +56,6 @@ jq -r '
   | "\(.key|ascii_upcase)\t\($path)\t\($summary)\t\($desc)"
 ' /tmp/openapi.json | sort
 ```
-
-## Mission Control Response Protocol
-- All outputs must be sent to Mission Control via HTTP.
-- Always include: `X-Agent-Token: {{ auth_token }}`
-
-## Schedule
-- If a heartbeat schedule is configured, send a lightweight check-in only.
-- On first cycle after wake/bootstrap, run heartbeat check-in immediately (do not wait for cadence).
-- Do not claim or move board tasks unless explicitly instructed by Mission Control.
-- If you have any pending `LEAD REQUEST: ASK USER` messages in OpenClaw chat, handle them promptly (see AGENTS.md).
-
-## Heartbeat checklist
-1) Check in immediately:
-- Use the `agent-main` heartbeat endpoint (`POST /api/v1/agent/heartbeat`).
-- Startup check-in example:
-
-```bash
-curl -s -X POST "{{ base_url }}/api/v1/agent/heartbeat" \
-  -H "X-Agent-Token: {{ auth_token }}"
-```
-
-- If check-in fails due to 5xx/network, stop and retry next heartbeat.
-- During that failure window, do **not** write memory updates (`MEMORY.md`, daily memory files).
 
 ## Memory Maintenance (every 2-3 days)
 1) Read recent `memory/YYYY-MM-DD.md` files.

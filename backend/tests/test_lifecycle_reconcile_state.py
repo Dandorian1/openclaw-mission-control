@@ -9,8 +9,11 @@ from uuid import uuid4
 from app.core.time import utcnow
 from app.models.agents import Agent
 from app.services.openclaw.constants import (
+    BOARD_AGENT_CHECKIN_DEADLINE_AFTER_WAKE,
     CHECKIN_DEADLINE_AFTER_WAKE,
+    MAIN_AGENT_CHECKIN_DEADLINE_AFTER_WAKE,
     MAX_WAKE_ATTEMPTS_WITHOUT_CHECKIN,
+    checkin_deadline_after_wake,
 )
 from app.services.openclaw.lifecycle_reconcile import _has_checked_in_since_wake
 
@@ -49,5 +52,9 @@ def test_not_checked_in_since_wake_when_missing_last_seen() -> None:
 
 
 def test_lifecycle_convergence_policy_constants() -> None:
-    assert CHECKIN_DEADLINE_AFTER_WAKE == timedelta(seconds=30)
+    assert BOARD_AGENT_CHECKIN_DEADLINE_AFTER_WAKE == timedelta(seconds=30)
+    assert CHECKIN_DEADLINE_AFTER_WAKE == BOARD_AGENT_CHECKIN_DEADLINE_AFTER_WAKE
+    assert MAIN_AGENT_CHECKIN_DEADLINE_AFTER_WAKE == timedelta(seconds=120)
+    assert checkin_deadline_after_wake(is_main_agent=False) == timedelta(seconds=30)
+    assert checkin_deadline_after_wake(is_main_agent=True) == timedelta(seconds=120)
     assert MAX_WAKE_ATTEMPTS_WITHOUT_CHECKIN == 3

@@ -217,6 +217,16 @@ class GatewayAdminLifecycleService(OpenClawDBService):
         notify: bool,
     ) -> Agent:
         orchestrator = AgentLifecycleOrchestrator(self.session)
+        reset_session = notify and action == "update"
+        if reset_session:
+            self.logger.info(
+                "gateway.main_agent.reset_session_on_update",
+                extra={
+                    "gateway_id": gateway.id,
+                    "agent_id": agent.id,
+                    "action": action,
+                },
+            )
         try:
             provisioned = await orchestrator.run_lifecycle(
                 gateway=gateway,
@@ -226,7 +236,7 @@ class GatewayAdminLifecycleService(OpenClawDBService):
                 action=action,
                 auth_token=None,
                 force_bootstrap=False,
-                reset_session=False,
+                reset_session=reset_session,
                 wake=notify,
                 deliver_wakeup=True,
                 wakeup_verb=None,
