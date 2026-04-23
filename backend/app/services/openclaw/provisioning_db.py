@@ -1459,6 +1459,11 @@ class AgentLifecycleService(OpenClawDBService):
         agent: Agent,
         status_value: str | None,
     ) -> AgentRead:
+        is_first_post_wake_checkin = (
+            agent.checkin_deadline_at is not None
+            and agent.last_wake_sent_at is not None
+            and (agent.last_seen_at is None or agent.last_seen_at < agent.last_wake_sent_at)
+        )
         if status_value:
             agent.status = status_value
         elif agent.status == "provisioning":
@@ -1471,6 +1476,19 @@ class AgentLifecycleService(OpenClawDBService):
         agent.updated_at = utcnow()
         self.record_heartbeat(self.session, agent)
         self.session.add(agent)
+        if is_first_post_wake_checkin:
+            self.logger.info(
+                "agent.heartbeat.post_wake_checkin",
+                extra={
+                    "agent_id": str(agent.id),
+                    "gateway_id": str(agent.gateway_id),
+                    "board_id": str(agent.board_id) if agent.board_id is not None else None,
+                    "agent_role": "main" if agent.board_id is None else "board",
+                    "wake_attempts": agent.wake_attempts,
+                    "checkin_deadline_at": agent.checkin_deadline_at,
+                    "last_wake_sent_at": agent.last_wake_sent_at,
+                },
+            )
         await self.session.commit()
         await self.session.refresh(agent)
         return self.to_agent_read(self.with_computed_status(agent))

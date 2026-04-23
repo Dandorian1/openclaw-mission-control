@@ -19,11 +19,23 @@ DEFAULT_HEARTBEAT_CONFIG: dict[str, Any] = {
 
 OFFLINE_AFTER = timedelta(minutes=10)
 # Provisioning convergence policy:
-# - require first heartbeat/check-in within 30s of wake
+# - require first heartbeat/check-in within 120s for main agents
+# - require first heartbeat/check-in within 30s for board agents
 # - allow up to 3 wake attempts before giving up
-CHECKIN_DEADLINE_AFTER_WAKE = timedelta(seconds=30)
+BOARD_AGENT_CHECKIN_DEADLINE_AFTER_WAKE = timedelta(seconds=30)
+MAIN_AGENT_CHECKIN_DEADLINE_AFTER_WAKE = timedelta(seconds=120)
+# Backwards-compat alias kept for existing board-agent callers/tests.
+CHECKIN_DEADLINE_AFTER_WAKE = BOARD_AGENT_CHECKIN_DEADLINE_AFTER_WAKE
 MAX_WAKE_ATTEMPTS_WITHOUT_CHECKIN = 3
 AGENT_SESSION_PREFIX = "agent"
+
+
+def checkin_deadline_after_wake(*, is_main_agent: bool) -> timedelta:
+    """Return the post-wake check-in grace period for the given agent role."""
+
+    if is_main_agent:
+        return MAIN_AGENT_CHECKIN_DEADLINE_AFTER_WAKE
+    return BOARD_AGENT_CHECKIN_DEADLINE_AFTER_WAKE
 
 DEFAULT_CHANNEL_HEARTBEAT_VISIBILITY: dict[str, bool] = {
     # Suppress routine HEARTBEAT_OK delivery by default.

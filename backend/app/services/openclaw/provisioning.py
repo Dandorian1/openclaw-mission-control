@@ -1151,6 +1151,14 @@ def _should_include_bootstrap(
 
 
 def _wakeup_text(agent: Agent, *, verb: str) -> str:
+    if agent.board_id is None:
+        return (
+            f"Hello {agent.name}. Your workspace has been {verb}.\n\n"
+            "Before any other startup work, including OpenAPI scans or workspace checklist "
+            "reads, send one POST /api/v1/agent/heartbeat check-in using the "
+            "X-Agent-Token from HEARTBEAT.md. After that succeeds, read AGENTS.md and "
+            "continue any gateway-main duties."
+        )
     return (
         f"Hello {agent.name}. Your workspace has been {verb}.\n\n"
         "Start the agent. If BOOTSTRAP.md exists, read it first, then read AGENTS.md. "

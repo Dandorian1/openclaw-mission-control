@@ -34,6 +34,8 @@ class _AgentStub:
     openclaw_session_id: str | None = None
     heartbeat_config: dict | None = None
     is_board_lead: bool = False
+    board_id: UUID | None = None
+    preferred_model: str | None = None
     id: UUID = field(default_factory=uuid4)
     identity_profile: dict | None = None
     identity_template: str | None = None
@@ -56,8 +58,19 @@ def test_workspace_path_preserves_tilde_in_workspace_root():
     assert agent_provisioning._workspace_path(agent, "~/.openclaw") == "~/.openclaw/workspace-alice"
 
 
-def test_wakeup_text_includes_bootstrap_before_agents():
+def test_main_agent_wakeup_text_requires_heartbeat_before_agents():
     agent = _AgentStub(name="Alice")
+
+    text = agent_provisioning._wakeup_text(agent, verb="created")
+
+    assert "Before any other startup work" in text
+    assert "POST /api/v1/agent/heartbeat" in text
+    assert "After that succeeds, read AGENTS.md" in text
+    assert "BOOTSTRAP.md" not in text
+
+
+def test_board_agent_wakeup_text_keeps_bootstrap_before_agents():
+    agent = _AgentStub(name="Alice", board_id=uuid4())
 
     text = agent_provisioning._wakeup_text(agent, verb="created")
 
